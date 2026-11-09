@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>공연 모아보기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1FA;--paper:#FFFFFF;--ink:#1B2559;--muted:#5B6490;--line:#CBD3EE;--soft:#DCE3F7;
+  --pick:#F5B700;--pickink:#1B2559;--warn:#D9482B;color-scheme:light;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0F1330;--paper:#1A2048;--ink:#E9EDFC;--muted:#9AA3D0;--line:#323B73;--soft:#2B3366;--warn:#FF8A6B;color-scheme:dark}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;line-height:1.5;padding-bottom:40px}
+.wrap{max-width:600px;margin:0 auto;padding:20px 16px}
+h1{font-family:"Black Han Sans","Noto Sans KR",sans-serif;font-weight:400;font-size:34px;line-height:1.15;margin:4px 0 2px}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.lab{font-size:13px;font-weight:700;color:var(--muted);min-width:46px}
+button,select,input{font:inherit;color:inherit}
+.chip{all:unset;box-sizing:border-box;cursor:pointer;padding:7px 13px;border-radius:999px;border:2px solid var(--line);background:var(--paper);font-weight:500;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:6px 14px;font-size:14px;font-weight:500;background:var(--paper)}
+.seg button[aria-pressed="true"]{background:var(--pick);color:var(--pickink);font-weight:700}
+select,input[type=search]{background:var(--paper);border:2px solid var(--line);border-radius:10px;padding:8px 10px;min-height:40px}
+input[type=search]{flex:1;min-width:0}
+:focus-visible{outline:3px solid #2B6CE0;outline-offset:2px}
+h2{font-size:16px;margin:22px 0 8px}
+h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
+.card{display:flex;gap:12px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.poster{width:64px;height:88px;border-radius:8px;object-fit:cover;background:var(--soft);flex:none}
+.info{min-width:0;flex:1}
+.info h3{margin:0;font-size:16px;line-height:1.35;word-break:keep-all}
+.meta{color:var(--muted);font-size:13px;margin:2px 0 6px}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:2px 8px;background:var(--soft);margin-right:6px}
+.links{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;font-weight:700;font-size:13px;padding:6px 12px;border-radius:9px;background:var(--pick);color:var(--pickink)}
+.none{font-size:12px;color:var(--muted);margin-top:6px}
+.state{padding:30px 10px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:14px}
+.state.err{color:var(--warn)}
+.foot{margin-top:16px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>공연 모아보기</h1>
+  <p class="sub">공연예술통합전산망(KOPIS)의 공연 정보를 그때그때 불러와요.</p>
+
+  <div class="row"><span class="lab">종류</span><div class="row" id="cats" style="margin:0"></div></div>
+  <div class="row"><span class="lab">기간</span>
+    <select id="period" aria-label="기간 선택">
+      <option value="0">오늘부터 30일</option>
+      <option value="30">30일 뒤부터 30일</option>
+      <option value="60">60일 뒤부터 30일</option>
+    </select>
+  </div>
+  <div class="row"><span class="lab">검색</span>
+    <input type="search" id="q" placeholder="공연 이름" maxlength="30" aria-label="공연 이름 검색">
+    <button class="btn" id="go">검색</button>
+  </div>
+  <div class="row"><span class="lab">보기</span>
+    <div class="seg" id="view"><button data-v="list" aria-pressed="true">목록</button><button data-v="plat" aria-pressed="false">예매처별</button></div>
+  </div>
+
+  <div id="out" role="status" aria-live="polite"></div>
+  <div class="foot">출처: 공연예술통합전산망(KOPIS). 예매 일정과 좌석 현황은 각 예매처에서 꼭 다시 확인하세요.</div>
+</main>
+
+<script>
+// 종류 설정: label(버튼 이름), genre(KOPIS 장르 코드), q(공연명 키워드, 선택)
+// 장르 코드는 KOPIS 오픈API 문서에서 꼭 확인하고, 필요하면 아래 목록을 고쳐 쓰세요.
+var CATS = [
+  {label:"전체"},
+  {label:"뮤지컬", genre:"GGGA"},
+  {label:"연극", genre:"AAAA"},
+  {label:"클래식", genre:"CCCA"},
+  {label:"국악", genre:"CCCC"},
+  {label:"대중음악", genre:"CCCD"},
+  {label:"트로트 (부모님)", genre:"CCCD", q:"트로트"}
+];
+var S = {cat:0, view:"list", items:[], loading:false};
+var $ = function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function safeUrl(u){return /^https?:\/\//i.test(u||"")?u:""}
+function ymd(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")}
+
+function renderCats(){
+  $("cats").innerHTML = CATS.map(function(c,i){
+    return '<button class="chip" data-i="'+i+'" aria-pressed="'+(i===S.cat)+'">'+esc(c.label)+'</button>';
+  }).join("");
+}
+function card(x){
+  var poster = x.poster ? '<img class="poster" loading="lazy" referrerpolicy="no-referrer" alt="" src="'+esc(x.poster.replace(/^http:/,"https:"))+'" onerror="this.style.visibility=\'hidden\'">' : '<div class="poster"></div>';
+  var links = (x.relates||[]).filter(function(r){return safeUrl(r.url)}).map(function(r){
+    return '<a class="btn" href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.name)+'</a>';
+  }).join("");
+  return '<div class="card">'+poster+'<div class="info"><h3>'+esc(x.name)+'</h3>'+
+    '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+
+    '<span class="tag">'+esc(x.genre)+'</span><span class="tag">'+esc(x.state)+'</span>'+
+    (links?'<div class="links">'+links+'</div>':'<div class="none">예매처 링크 정보가 없어요.</div>')+
+    '</div></div>';
+}
+function render(){
+  if(S.loading){$("out").innerHTML='<div class="state">불러오는 중이에요…</div>';return}
+  if(!S.items.length){$("out").innerHTML='<div class="state">조건에 맞는 공연이 없어요.</div>';return}
+  if(S.view==="list"){$("out").innerHTML=S.items.map(card).join("");return}
+  var groups={},order=[];
+  S.items.forEach(function(x){
+    var names=(x.relates||[]).map(function(r){return r.name});
+    if(!names.length)names=["예매처 정보 없음"];
+    names.forEach(function(n){if(!groups[n]){groups[n]=[];order.push(n)}groups[n].push(x)});
+  });
+  $("out").innerHTML=order.map(function(n){
+    return '<h2>'+esc(n)+'<span>'+groups[n].length+'개</span></h2>'+groups[n].map(card).join("");
+  }).join("");
+}
+function load(){
+  var c=CATS[S.cat],off=+$("period").value,qv=$("q").value.trim()||c.q||"";
+  var a=new Date();a.setDate(a.getDate()+off);
+  var b=new Date(a.getTime());b.setDate(b.getDate()+30);
+  var u="/api/shows?from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"");
+  S.loading=true;render();
+  fetch(u).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"오류");return j})})
+  .then(function(j){S.items=j.items||[];S.loading=false;render()})
+  .catch(function(e){S.loading=false;$("out").innerHTML='<div class="state err">'+esc(e.message||"불러오지 못했어요.")+'</div>'});
+}
+$("cats").addEventListener("click",function(e){var b=e.target.closest("[data-i]");if(!b)return;S.cat=+b.dataset.i;renderCats();load()});
+$("period").addEventListener("change",load);
+$("go").addEventListener("click",load);
+$("q").addEventListener("keydown",function(e){if(e.key==="Enter")load()});
+$("view").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;S.view=b.dataset.v;
+  Array.prototype.forEach.call($("view").children,function(x){x.setAttribute("aria-pressed",String(x===b))});render()});
+renderCats();load();
+</script>
+</body>
+</html>
