@@ -48,6 +48,12 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
 .state.err{color:var(--warn)}
 .prog{font-size:13px;color:var(--muted);margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .btn.g{background:var(--soft);color:var(--ink);font-weight:500}
+.card{position:relative}
+.heart{all:unset;cursor:pointer;position:absolute;top:8px;right:10px;font-size:22px;line-height:1;color:var(--muted);padding:4px}
+.heart[aria-pressed="true"]{color:#E5484D}
+.info h3{padding-right:30px}
+.price{font-size:13px;font-weight:700;margin:0 0 6px}
+.tag.soon{background:var(--warn);color:#fff}
 .foot{margin-top:16px;font-size:12px;color:var(--muted)}
 </style>
 </head>
@@ -57,7 +63,7 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
   <p class="sub">서울·경기 공연장만 보여 줘요. 뮤지컬은 대극장만 보여요.</p>
 
   <div class="row"><span class="lab">구분</span>
-    <div class="seg" id="mode"><button data-m="popular" aria-pressed="true">인기 공연</button><button data-m="upcoming" aria-pressed="false">공연 예정</button></div>
+    <div class="seg" id="mode"><button data-m="popular" aria-pressed="true">인기 공연</button><button data-m="upcoming" aria-pressed="false">공연 예정</button><button data-m="saved" aria-pressed="false">♥ 찜</button></div>
   </div>
   <p class="sub" id="modeNote" style="margin:0 0 6px;font-size:13px"></p>
   <div class="row"><span class="lab">종류</span><div class="row" id="cats" style="margin:0"></div></div>
@@ -66,6 +72,15 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
       <option value="0">오늘부터 30일</option>
       <option value="30">30일 뒤부터 30일</option>
       <option value="60">60일 뒤부터 30일</option>
+    </select>
+  </div>
+  <div class="row"><span class="lab">예산</span>
+    <select id="budget" aria-label="예산 선택">
+      <option value="0">전체</option>
+      <option value="30000">가장 싼 좌석 3만 원 이하</option>
+      <option value="50000">가장 싼 좌석 5만 원 이하</option>
+      <option value="100000">가장 싼 좌석 10만 원 이하</option>
+      <option value="150000">가장 싼 좌석 15만 원 이하</option>
     </select>
   </div>
   <div class="row"><span class="lab">검색</span>
@@ -93,7 +108,16 @@ var CATS = [
   {label:"트로트 (부모님)", genre:"CCCD", tag:"trot"}
 ];
 var S = {cat:0, view:"list", mode:"popular", items:[], done:true, err:"", found:0};
-var NOTES = {popular:"최근 30일 예매 순위 순서예요. 예매처가 있는 공연만 보여요.", upcoming:"아직 시작하지 않은 공연이에요. 예매처가 아직 없는 공연도 함께 보여요."};
+var NOTES = {popular:"최근 30일 예매 순위 순서예요. 예매처가 있는 공연만 보여요.", upcoming:"아직 시작하지 않은 공연이에요. 예매처가 아직 없는 공연도 함께 보여요.", saved:"하트를 누른 공연이에요. 이 휴대폰에만 저장돼요."};
+var FKEY = "showboard-favs-v1", FAVS = {};
+try { FAVS = JSON.parse(localStorage.getItem(FKEY) || "{}") || {}; } catch (e) { FAVS = {}; }
+function saveFavs(){ try { localStorage.setItem(FKEY, JSON.stringify(FAVS)); } catch (e) {} }
+function won(n){ return n.toLocaleString("ko-KR")+"원"; }
+function daysLeft(end){
+  var m=(end||"").match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); if(!m) return null;
+  var t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((new Date(+m[1],+m[2]-1,+m[3])-t)/864e5);
+}
 var MAX_PAGES = 5, RUN = 0;
 var $ = function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -106,27 +130,35 @@ function renderCats(){
   }).join("");
 }
 function card(x){
+  var fav=!!FAVS[x.id], dl=daysLeft(x.end);
+  var price = x.minPrice==null ? '' : '<div class="price">'+(x.minPrice===0?'무료':x.minPrice===x.maxPrice?won(x.minPrice):won(x.minPrice)+' ~ '+won(x.maxPrice))+'</div>';
   var poster = x.poster ? '<img class="poster" loading="lazy" referrerpolicy="no-referrer" alt="" src="'+esc(x.poster.replace(/^http:/,"https:"))+'" onerror="this.style.visibility=\'hidden\'">' : '<div class="poster"></div>';
   var links = (x.relates||[]).filter(function(r){return safeUrl(r.url)}).map(function(r){
     return '<a class="btn" href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.name)+'</a>';
   }).join("");
-  return '<div class="card">'+poster+'<div class="info"><h3>'+esc(x.name)+'</h3>'+
-    '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+
+  return '<div class="card">'+poster+'<button class="heart" data-fav="'+esc(x.id)+'" aria-pressed="'+fav+'" aria-label="찜하기">'+(fav?'♥':'♡')+'</button><div class="info"><h3>'+esc(x.name)+'</h3>'+
+    '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+price+
+    (dl!=null&&dl>=0&&dl<=14?'<span class="tag soon">곧 종료 '+(dl===0?'오늘':'D-'+dl)+'</span>':'')+
     (S.mode==="popular"&&x.rank&&x.rank<999?'<span class="tag" style="background:var(--pick);color:var(--pickink)">'+esc((x.area||"").slice(0,2))+' '+x.rank+'위</span>':'')+
     '<span class="tag">'+esc(x.genre)+'</span>'+(x.seats?'<span class="tag">'+x.seats.toLocaleString("ko-KR")+'석</span>':'')+
     '<span class="tag">'+esc((x.area||"").replace(/특별시|광역시|도$/,""))+'</span>'+
     (links?'<div class="links">'+links+'</div>':'<div class="none">예매처 미정</div>')+'</div></div>';
 }
+function visible(){
+  var b=+$("budget").value;
+  return b ? S.items.filter(function(x){return x.minPrice!=null && x.minPrice<=b}) : S.items;
+}
 function render(){
+  var items=visible();
   var head = S.err ? '<div class="state err">'+esc(S.err)+'</div>'
     : (!S.done ? '<div class="prog">공연을 확인하는 중이에요. 지금까지 '+S.items.length+'개 찾았어요. <button class="btn g" id="stop">그만 찾기</button></div>' : '');
-  if(!S.items.length){
-    $("out").innerHTML = head + (S.done&&!S.err ? '<div class="state">조건에 맞는 공연이 없어요.</div>' : '');
+  if(!items.length){
+    $("out").innerHTML = head + (S.done&&!S.err ? '<div class="state">'+(S.mode==="saved"&&!S.items.length?'아직 찜한 공연이 없어요. 공연 카드의 ♡를 눌러 보세요.':'조건에 맞는 공연이 없어요.'+(+$("budget").value?' 가격 정보가 없는 공연은 예산 필터에서 빠져요.':''))+'</div>' : '');
   } else if(S.view==="list"){
-    $("out").innerHTML = head + S.items.map(card).join("");
+    $("out").innerHTML = head + items.map(card).join("");
   } else {
     var groups={},order=[];
-    S.items.forEach(function(x){(x.relates||[]).forEach(function(r){if(!groups[r.name]){groups[r.name]=[];order.push(r.name)}groups[r.name].push(x)})});
+    items.forEach(function(x){(x.relates||[]).forEach(function(r){if(!groups[r.name]){groups[r.name]=[];order.push(r.name)}groups[r.name].push(x)})});
     $("out").innerHTML = head + order.map(function(n){
       return '<h2>'+esc(n)+'<span>'+groups[n].length+'개</span></h2>'+groups[n].map(card).join("");
     }).join("");
@@ -134,6 +166,11 @@ function render(){
   var st=$("stop"); if(st) st.onclick=function(){RUN++;S.done=true;render()};
 }
 function load(){
+  if(S.mode==="saved"){
+    RUN++; S.err=""; S.done=true;
+    S.items=Object.keys(FAVS).map(function(k){return FAVS[k]}).sort(function(p,q){return p.start<q.start?-1:p.start>q.start?1:0});
+    render(); return;
+  }
   var run=++RUN, c=CATS[S.cat], off=+$("period").value, qv=$("q").value.trim()||c.q||"";
   var a=new Date();a.setDate(a.getDate()+off);
   var b=new Date(a.getTime());b.setDate(b.getDate()+30);
@@ -164,6 +201,15 @@ $("view").addEventListener("click",function(e){var b=e.target.closest("[data-v]"
 $("mode").addEventListener("click",function(e){var b=e.target.closest("[data-m]");if(!b)return;S.mode=b.dataset.m;
   Array.prototype.forEach.call($("mode").children,function(x){x.setAttribute("aria-pressed",String(x===b))});$("modeNote").textContent=NOTES[S.mode];load()});
 $("modeNote").textContent=NOTES[S.mode];
+$("budget").addEventListener("change",render);
+$("out").addEventListener("click",function(e){
+  var b=e.target.closest("[data-fav]"); if(!b) return;
+  var id=b.dataset.fav;
+  if(FAVS[id]) delete FAVS[id];
+  else { var x=S.items.filter(function(i){return i.id===id})[0]; if(x) FAVS[id]={id:x.id,name:x.name,start:x.start,end:x.end,venue:x.venue,area:x.area,poster:x.poster,genre:x.genre,relates:x.relates,minPrice:x.minPrice,maxPrice:x.maxPrice}; }
+  saveFavs();
+  if(S.mode==="saved") load(); else render();
+});
 renderCats();load();
 </script>
 </body>
