@@ -1,0 +1,16 @@
+{
+  "name": "공연 모아보기",
+  "short_name": "공연모아",
+  "description": "서울·경기 공연을 종류별, 예매처별로 모아 보고 예매 오픈 알림을 받아요.",
+  "lang": "ko",
+  "start_url": "/?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EEF1FA",
+  "theme_color": "#1B2559",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

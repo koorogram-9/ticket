@@ -4,22 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>공연 모아보기</title>
+<meta name="description" content="서울·경기 공연을 종류별, 예매처별로 모아 보고 예매 오픈 알림을 받아요.">
+<meta name="theme-color" content="#1B2559">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="공연모아">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#EEF1FA;--paper:#FFFFFF;--ink:#1B2559;--muted:#5B6490;--line:#CBD3EE;--soft:#DCE3F7;
-  --pick:#F5B700;--pickink:#1B2559;--warn:#D9482B;color-scheme:light;
+  --pick:#F5B700;--pickink:#1B2559;--warn:#D9482B;--ok:#1E8E5A;color-scheme:light;
   box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#0F1330;--paper:#1A2048;--ink:#E9EDFC;--muted:#9AA3D0;--line:#323B73;--soft:#2B3366;--warn:#FF8A6B;color-scheme:dark}
+  :root{--bg:#0F1330;--paper:#1A2048;--ink:#E9EDFC;--muted:#9AA3D0;--line:#323B73;--soft:#2B3366;--warn:#FF8A6B;--ok:#4FD39A;color-scheme:dark}
 }
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;line-height:1.5;padding-bottom:40px}
 .wrap{max-width:600px;margin:0 auto;padding:20px 16px}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.top h1{white-space:nowrap}
+.tools{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:8px}
 h1{font-family:"Black Han Sans","Noto Sans KR",sans-serif;font-weight:400;font-size:34px;line-height:1.15;margin:4px 0 2px}
 .sub{color:var(--muted);margin:0 0 16px;font-size:14px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
@@ -30,36 +41,65 @@ button,select,input{font:inherit;color:inherit}
 .seg{display:inline-flex;border:2px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{all:unset;cursor:pointer;padding:6px 14px;font-size:14px;font-weight:500;background:var(--paper)}
 .seg button[aria-pressed="true"]{background:var(--pick);color:var(--pickink);font-weight:700}
-select,input[type=search]{background:var(--paper);border:2px solid var(--line);border-radius:10px;padding:8px 10px;min-height:40px}
-input[type=search]{flex:1;min-width:0}
+select,input[type=search],input[type=text]{background:var(--paper);border:2px solid var(--line);border-radius:10px;padding:8px 10px;min-height:40px}
+input[type=search],input[type=text]{flex:1;min-width:0}
 :focus-visible{outline:3px solid #2B6CE0;outline-offset:2px}
 h2{font-size:16px;margin:22px 0 8px}
 h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
-.card{display:flex;gap:12px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.card{position:relative;display:flex;gap:12px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;cursor:pointer}
 .poster{width:64px;height:88px;border-radius:8px;object-fit:cover;background:var(--soft);flex:none}
 .info{min-width:0;flex:1}
-.info h3{margin:0;font-size:16px;line-height:1.35;word-break:keep-all}
+.info h3{margin:0;font-size:16px;line-height:1.35;word-break:keep-all;padding-right:30px}
+.title{all:unset;cursor:pointer}
 .meta{color:var(--muted);font-size:13px;margin:2px 0 6px}
-.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:2px 8px;background:var(--soft);margin-right:6px}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:2px 8px;background:var(--soft);margin:0 6px 4px 0}
+.tag.soon{background:var(--warn);color:#fff}
+.tag.open{background:var(--ok);color:#fff}
+.tag.rank{background:var(--pick);color:var(--pickink)}
 .links{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.btn{all:unset;box-sizing:border-box;cursor:pointer;font-weight:700;font-size:13px;padding:6px 12px;border-radius:9px;background:var(--pick);color:var(--pickink)}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;font-weight:700;font-size:13px;padding:6px 12px;border-radius:9px;background:var(--pick);color:var(--pickink);text-align:center}
+.btn.g{background:var(--soft);color:var(--ink);font-weight:500}
+.btn[disabled]{opacity:.5;cursor:default}
 .none{font-size:12px;color:var(--muted);margin-top:6px}
 .state{padding:30px 10px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:14px}
 .state.err{color:var(--warn)}
 .prog{font-size:13px;color:var(--muted);margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.btn.g{background:var(--soft);color:var(--ink);font-weight:500}
-.card{position:relative}
 .heart{all:unset;cursor:pointer;position:absolute;top:8px;right:10px;font-size:22px;line-height:1;color:var(--muted);padding:4px}
 .heart[aria-pressed="true"]{color:#E5484D}
-.info h3{padding-right:30px}
 .price{font-size:13px;font-weight:700;margin:0 0 6px}
-.tag.soon{background:var(--warn);color:#fff}
 .foot{margin-top:16px;font-size:12px;color:var(--muted)}
+.box{background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:12px 14px;margin:6px 0 14px;font-size:14px}
+.box h4{margin:0 0 4px;font-size:14px}
+.box p{margin:0 0 8px;color:var(--muted);font-size:13px}
+.box .row{margin:6px 0}
+.box + .box{margin-top:-4px}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:16px;letter-spacing:1px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+#toast.on{opacity:1}
+dialog{border:none;padding:0;border-radius:18px;background:var(--paper);color:var(--ink);width:min(560px,calc(100% - 24px));max-height:calc(100% - 40px)}
+dialog::backdrop{background:rgba(10,14,40,.55)}
+.dlg{padding:16px 16px 20px;position:relative}
+.dlg .x{all:unset;cursor:pointer;position:absolute;top:10px;right:12px;font-size:26px;line-height:1;padding:4px 8px;color:var(--muted)}
+.dlg h3{margin:0 40px 6px 0;font-size:20px;line-height:1.35;word-break:keep-all}
+.dlg .hero{display:flex;gap:14px;margin-bottom:12px}
+.dlg .hero img{width:110px;height:150px;object-fit:cover;border-radius:10px;background:var(--soft);flex:none}
+.dlg dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:12px 0;font-size:14px}
+.dlg dt{font-weight:700;color:var(--muted);white-space:nowrap}
+.dlg dd{margin:0;word-break:break-word;white-space:pre-line}
+.dlg .story{font-size:14px;white-space:pre-line;color:var(--ink);margin:10px 0}
+.dlg .imgs img{width:100%;border-radius:10px;margin-top:8px;background:var(--soft)}
+.dlg .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 </style>
 </head>
 <body>
 <main class="wrap">
-  <h1>공연 모아보기</h1>
+  <div class="top">
+    <h1>공연 모아보기</h1>
+    <div class="tools">
+      <button class="btn g" id="install" hidden>📲 앱 설치</button>
+      <button class="btn g" id="share">🔗 공유</button>
+    </div>
+  </div>
   <p class="sub">서울·경기 공연장만 보여 줘요. 뮤지컬은 대극장만 보여요.</p>
 
   <div class="row"><span class="lab">구분</span>
@@ -94,55 +134,119 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
   <div id="out" role="status" aria-live="polite"></div>
   <div class="foot">출처: 공연예술통합전산망(KOPIS). 예매 일정과 좌석 현황은 각 예매처에서 꼭 다시 확인하세요.</div>
 </main>
+<dialog id="dlg" aria-label="공연 상세"><div class="dlg" id="dlgBody"></div></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-// 종류 설정: label(버튼 이름), genre(KOPIS 장르 코드), q(공연명 키워드, 선택)
+// 종류 설정: key(공유 링크용 이름), label(버튼 이름), genre(KOPIS 장르 코드), q(공연명 키워드, 선택)
 // 장르 코드는 KOPIS 오픈API 문서에서 꼭 확인하고, 필요하면 아래 목록을 고쳐 쓰세요.
 var CATS = [
-  {label:"전체"},
-  {label:"뮤지컬", genre:"GGGA"},
-  {label:"연극", genre:"AAAA"},
-  {label:"클래식", genre:"CCCA"},
-  {label:"국악", genre:"CCCC"},
-  {label:"대중음악", genre:"CCCD"},
-  {label:"트로트 (부모님)", genre:"CCCD", tag:"trot"}
+  {key:"all", label:"전체"},
+  {key:"musical", label:"뮤지컬", genre:"GGGA"},
+  {key:"play", label:"연극", genre:"AAAA"},
+  {key:"classic", label:"클래식", genre:"CCCA"},
+  {key:"gugak", label:"국악", genre:"CCCC"},
+  {key:"pop", label:"대중음악", genre:"CCCD"},
+  {key:"trot", label:"트로트 (부모님)", genre:"CCCD", tag:"trot"}
 ];
-var S = {cat:0, view:"list", mode:"popular", items:[], done:true, err:"", found:0};
-var NOTES = {popular:"최근 30일 예매 순위 순서예요. 예매처가 있는 공연만 보여요.", upcoming:"아직 시작하지 않은 공연이에요. 예매처가 아직 없는 공연도 함께 보여요.", saved:"하트를 누른 공연이에요. 이 휴대폰에만 저장돼요."};
-var FKEY = "showboard-favs-v1", FAVS = {};
-try { FAVS = JSON.parse(localStorage.getItem(FKEY) || "{}") || {}; } catch (e) { FAVS = {}; }
-function saveFavs(){ try { localStorage.setItem(FKEY, JSON.stringify(FAVS)); } catch (e) {} }
+var S = {cat:0, view:"list", mode:"popular", items:[], done:true, err:"", syncMsg:"", pushMsg:"", busy:""};
+var NOTES = {popular:"최근 30일 예매 순위 순서예요. 예매처가 있는 공연만 보여요.", upcoming:"아직 시작하지 않은 공연이에요. 예매처가 아직 없는 공연도 함께 보여요.", saved:"하트를 누른 공연이에요. 동기화를 켜면 다른 기기에서도 볼 수 있어요."};
+var MAX_PAGES = 5, RUN = 0;
+var REFRESH_MS = 6*3600e3;      // 찜 공연 정보를 새로 받아 오는 간격
+var OPEN_BADGE_MS = 7*864e5;    // "예매 오픈" 배지를 보여 주는 기간
+var $ = function(i){return document.getElementById(i)};
+
+// ---------- 저장 ----------
+function lsGet(k, d){ try { var v = JSON.parse(localStorage.getItem(k)); return v==null ? d : v; } catch (e) { return d; } }
+function lsSet(k, v){ try { if (v==null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+var FKEY="showboard-favs-v1", RKEY="showboard-removed-v1", CKEY="showboard-sync-v1", PKEY="showboard-push-v1";
+var FAVS = lsGet(FKEY, {}) || {}, REMOVED = lsGet(RKEY, {}) || {}, SYNC = lsGet(CKEY, null), PUSH = lsGet(PKEY, null);
+(function migrate(){ var now=Date.now(), ch=false; for (var k in FAVS) { if (!FAVS[k].t) { FAVS[k].t=now; ch=true; } } if (ch) lsSet(FKEY, FAVS); })();
+function saveFavs(){ lsSet(FKEY, FAVS); lsSet(RKEY, REMOVED); }
+
+// ---------- 도구 ----------
 function won(n){ return n.toLocaleString("ko-KR")+"원"; }
 function daysLeft(end){
   var m=(end||"").match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); if(!m) return null;
   var t=new Date(); t.setHours(0,0,0,0);
   return Math.round((new Date(+m[1],+m[2]-1,+m[3])-t)/864e5);
 }
-var MAX_PAGES = 5, RUN = 0;
-var $ = function(i){return document.getElementById(i)};
-function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function safeUrl(u){return /^https?:\/\//i.test(u||"")?u:""}
+function https(u){return (u||"").replace(/^http:/,"https:")}
 function ymd(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")}
+function byStart(p,q){return p.start<q.start?-1:p.start>q.start?1:0}
+function priceText(x){ return x.minPrice==null ? "" : x.minPrice===0 ? "무료" : x.minPrice===x.maxPrice ? won(x.minPrice) : won(x.minPrice)+" ~ "+won(x.maxPrice); }
+function api(url, body){
+  var opt = body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {};
+  return fetch(url, opt).then(function(r){ return r.json().catch(function(){return {}}).then(function(j){ if(!r.ok){ var e=new Error(j.error||"요청에 실패했어요."); e.status=r.status; throw e; } return j; }); });
+}
+var toastT;
+function toast(msg){ var t=$("toast"); t.textContent=msg; t.className="on"; clearTimeout(toastT); toastT=setTimeout(function(){t.className=""},2600); }
+function shareLink(url, title){
+  if (navigator.share) { navigator.share({title:title||document.title, url:url}).catch(function(){}); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){toast("링크를 복사했어요.")}, function(){window.prompt("이 링크를 복사하세요.", url)});
+  } else window.prompt("이 링크를 복사하세요.", url);
+}
 
+// ---------- 공유 링크 (주소에 필터 담기) ----------
+function stateUrl(extra){
+  var p = new URLSearchParams();
+  if (S.mode!=="popular") p.set("mode", S.mode);
+  if (S.cat) p.set("cat", CATS[S.cat].key);
+  if (+$("period").value) p.set("period", $("period").value);
+  if (+$("budget").value) p.set("budget", $("budget").value);
+  var q=$("q").value.trim(); if (q) p.set("q", q);
+  if (S.view!=="list") p.set("view", S.view);
+  for (var k in (extra||{})) p.set(k, extra[k]);
+  var s=p.toString();
+  return location.pathname + (s ? "?"+s : "");
+}
+function syncUrl(){
+  var cur = new URLSearchParams(location.search).get("show");
+  history.replaceState(history.state, "", stateUrl(cur ? {show:cur} : null));
+}
+function readUrl(){
+  var p = new URLSearchParams(location.search);
+  if (/^(popular|upcoming|saved)$/.test(p.get("mode")||"")) S.mode=p.get("mode");
+  for (var i=0;i<CATS.length;i++) if (CATS[i].key===p.get("cat")) S.cat=i;
+  function pick(el, v){ if (v && [].some.call(el.options, function(o){return o.value===v})) el.value=v; }
+  pick($("period"), p.get("period")); pick($("budget"), p.get("budget"));
+  if (p.get("q")) $("q").value=p.get("q").slice(0,30);
+  if (p.get("view")==="plat") S.view="plat";
+  return p;
+}
+function setPressed(box, attr, val){ [].forEach.call($(box).children, function(x){ x.setAttribute("aria-pressed", String(x.dataset[attr]===val)); }); }
+
+// ---------- 목록 화면 ----------
 function renderCats(){
   $("cats").innerHTML = CATS.map(function(c,i){
     return '<button class="chip" data-i="'+i+'" aria-pressed="'+(i===S.cat)+'">'+esc(c.label)+'</button>';
   }).join("");
 }
-function card(x){
-  var fav=!!FAVS[x.id], dl=daysLeft(x.end);
-  var price = x.minPrice==null ? '' : '<div class="price">'+(x.minPrice===0?'무료':x.minPrice===x.maxPrice?won(x.minPrice):won(x.minPrice)+' ~ '+won(x.maxPrice))+'</div>';
-  var poster = x.poster ? '<img class="poster" loading="lazy" referrerpolicy="no-referrer" alt="" src="'+esc(x.poster.replace(/^http:/,"https:"))+'" onerror="this.style.visibility=\'hidden\'">' : '<div class="poster"></div>';
-  var links = (x.relates||[]).filter(function(r){return safeUrl(r.url)}).map(function(r){
+function badges(x){
+  var dl=daysLeft(x.end), h="";
+  if (x.opened && Date.now()-x.opened < OPEN_BADGE_MS) h+='<span class="tag open">예매 오픈</span>';
+  if (dl!=null && dl<0) h+='<span class="tag">종료됨</span>';
+  else if (dl!=null && dl<=14) h+='<span class="tag soon">곧 종료 '+(dl===0?'오늘':'D-'+dl)+'</span>';
+  if (S.mode==="popular" && x.rank && x.rank<999) h+='<span class="tag rank">'+esc((x.area||"").slice(0,2))+' '+x.rank+'위</span>';
+  if (x.genre) h+='<span class="tag">'+esc(x.genre)+'</span>';
+  if (x.seats) h+='<span class="tag">'+x.seats.toLocaleString("ko-KR")+'석</span>';
+  if (x.area) h+='<span class="tag">'+esc(x.area.replace(/특별시|광역시|도$/,""))+'</span>';
+  return h;
+}
+function linkBtns(x){
+  return (x.relates||[]).filter(function(r){return safeUrl(r.url)}).map(function(r){
     return '<a class="btn" href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.name)+'</a>';
   }).join("");
-  return '<div class="card">'+poster+'<button class="heart" data-fav="'+esc(x.id)+'" aria-pressed="'+fav+'" aria-label="찜하기">'+(fav?'♥':'♡')+'</button><div class="info"><h3>'+esc(x.name)+'</h3>'+
-    '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+price+
-    (dl!=null&&dl>=0&&dl<=14?'<span class="tag soon">곧 종료 '+(dl===0?'오늘':'D-'+dl)+'</span>':'')+
-    (S.mode==="popular"&&x.rank&&x.rank<999?'<span class="tag" style="background:var(--pick);color:var(--pickink)">'+esc((x.area||"").slice(0,2))+' '+x.rank+'위</span>':'')+
-    '<span class="tag">'+esc(x.genre)+'</span>'+(x.seats?'<span class="tag">'+x.seats.toLocaleString("ko-KR")+'석</span>':'')+
-    '<span class="tag">'+esc((x.area||"").replace(/특별시|광역시|도$/,""))+'</span>'+
-    (links?'<div class="links">'+links+'</div>':'<div class="none">예매처 미정</div>')+'</div></div>';
+}
+function card(x){
+  var fav=!!FAVS[x.id], price=priceText(x), links=linkBtns(x);
+  var poster = x.poster ? '<img class="poster" loading="lazy" referrerpolicy="no-referrer" alt="" src="'+esc(https(x.poster))+'" onerror="this.style.visibility=\'hidden\'">' : '<div class="poster"></div>';
+  return '<div class="card" data-open="'+esc(x.id)+'">'+poster+'<button class="heart" data-fav="'+esc(x.id)+'" aria-pressed="'+fav+'" aria-label="찜하기">'+(fav?'♥':'♡')+'</button><div class="info"><h3><button class="title" data-open="'+esc(x.id)+'">'+esc(x.name)+'</button></h3>'+
+    '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+(price?'<div class="price">'+price+'</div>':'')+
+    badges(x)+(links?'<div class="links">'+links+'</div>':'<div class="none">예매처 미정</div>')+'</div></div>';
 }
 function visible(){
   var b=+$("budget").value;
@@ -150,7 +254,8 @@ function visible(){
 }
 function render(){
   var items=visible();
-  var head = S.err ? '<div class="state err">'+esc(S.err)+'</div>'
+  var head = S.mode==="saved" ? savedPanel() : "";
+  head += S.err ? '<div class="state err">'+esc(S.err)+'</div>'
     : (!S.done ? '<div class="prog">공연을 확인하는 중이에요. 지금까지 '+S.items.length+'개 찾았어요. <button class="btn g" id="stop">그만 찾기</button></div>' : '');
   if(!items.length){
     $("out").innerHTML = head + (S.done&&!S.err ? '<div class="state">'+(S.mode==="saved"&&!S.items.length?'아직 찜한 공연이 없어요. 공연 카드의 ♡를 눌러 보세요.':'조건에 맞는 공연이 없어요.'+(+$("budget").value?' 가격 정보가 없는 공연은 예산 필터에서 빠져요.':''))+'</div>' : '');
@@ -158,18 +263,20 @@ function render(){
     $("out").innerHTML = head + items.map(card).join("");
   } else {
     var groups={},order=[];
-    items.forEach(function(x){(x.relates||[]).forEach(function(r){if(!groups[r.name]){groups[r.name]=[];order.push(r.name)}groups[r.name].push(x)})});
+    items.forEach(function(x){(x.relates||[]).filter(function(r){return safeUrl(r.url)}).forEach(function(r){if(!groups[r.name]){groups[r.name]=[];order.push(r.name)}groups[r.name].push(x)})});
     $("out").innerHTML = head + order.map(function(n){
       return '<h2>'+esc(n)+'<span>'+groups[n].length+'개</span></h2>'+groups[n].map(card).join("");
     }).join("");
   }
   var st=$("stop"); if(st) st.onclick=function(){RUN++;S.done=true;render()};
 }
+function savedItems(){ return Object.keys(FAVS).map(function(k){return FAVS[k]}).sort(byStart); }
 function load(){
+  syncUrl();
   if(S.mode==="saved"){
     RUN++; S.err=""; S.done=true;
-    S.items=Object.keys(FAVS).map(function(k){return FAVS[k]}).sort(function(p,q){return p.start<q.start?-1:p.start>q.start?1:0});
-    render(); return;
+    S.items=savedItems();
+    render(); refreshFavs(); return;
   }
   var run=++RUN, c=CATS[S.cat], off=+$("period").value, qv=$("q").value.trim()||c.q||"";
   var a=new Date();a.setDate(a.getDate()+off);
@@ -179,38 +286,313 @@ function load(){
   S.items=[];S.done=false;S.err="";render();
   function step(){
     if(run!==RUN) return;
-    fetch(base+"&page="+page+"&offset="+offset)
-    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"오류");return j})})
+    api(base+"&page="+page+"&offset="+offset)
     .then(function(j){
       if(run!==RUN) return;
       (j.items||[]).forEach(function(x){if(!seen[x.id]){seen[x.id]=1;S.items.push(x)}});
-      if(S.mode==="upcoming") S.items.sort(function(p,q){return p.start<q.start?-1:p.start>q.start?1:0});
+      if(S.mode==="upcoming") S.items.sort(byStart);
       if(j.next && j.next.page<=MAX_PAGES){page=j.next.page;offset=j.next.offset;render();setTimeout(step,500)}
       else{S.done=true;render()}
     })
-    .catch(function(e){if(run!==RUN)return;S.done=true;S.err=e.message||"불러오지 못했어요.";render()});
+    .catch(function(e){if(run!==RUN)return;S.done=true;S.err=e.status?e.message:(navigator.onLine===false?"인터넷에 연결되어 있지 않아요.":"불러오지 못했어요. 인터넷 연결을 확인해 주세요.");render()});
   }
   step();
 }
+
+// ---------- 찜 ----------
+function favFrom(x, now){
+  return {id:x.id,name:x.name,start:x.start,end:x.end,venue:x.venue,area:x.area,poster:x.poster,genre:x.genre,
+    relates:(x.relates||[]).filter(function(r){return safeUrl(r.url)}),minPrice:x.minPrice==null?null:x.minPrice,maxPrice:x.maxPrice==null?null:x.maxPrice,
+    t:now,u:now,opened:x.opened||0};
+}
+function findItem(id){
+  if (DETAIL && DETAIL.id===id) return DETAIL;
+  return S.items.filter(function(i){return i.id===id})[0] || FAVS[id];
+}
+function toggleFav(id){
+  var now=Date.now();
+  if(FAVS[id]){ delete FAVS[id]; REMOVED[id]=now; }
+  else { var x=findItem(id); if(!x) return; FAVS[id]=favFrom(x, now); delete REMOVED[id]; }
+  saveFavs(); scheduleSync();
+  if(S.mode==="saved") { S.items=savedItems(); }
+  render(); if (DETAIL && DETAIL.id===id) renderDetail();
+}
+
+// 찜한 공연 정보를 주기적으로 새로 받아 와요. 예매처가 새로 생기면 알려 드려요.
+var refreshing=false;
+function refreshFavs(force){
+  if (refreshing) return;
+  var now=Date.now();
+  var ids=Object.keys(FAVS).filter(function(id){ var f=FAVS[id], dl=daysLeft(f.end); return (dl==null||dl>=0) && (force || now-(f.u||0)>REFRESH_MS); });
+  if (!ids.length) return;
+  refreshing=true;
+  var chunks=[]; for (var i=0;i<ids.length;i+=20) chunks.push(ids.slice(i,i+20));
+  var opened=[];
+  chunks.reduce(function(p, chunk){
+    return p.then(function(){
+      return api("/api/detail?ids="+chunk.map(encodeURIComponent).join(",")).then(function(j){
+        for (var id in j.items) {
+          var old=FAVS[id], d=j.items[id]; if(!old) continue;
+          var had=(old.relates||[]).length>0;
+          var nu=favFrom(Object.assign({}, old, {name:d.name||old.name,start:d.start||old.start,end:d.end||old.end,venue:d.venue||old.venue,area:d.area||old.area,
+            poster:d.poster||old.poster,genre:d.genre||old.genre,relates:d.relates,minPrice:d.minPrice,maxPrice:d.maxPrice}), Date.now());
+          nu.t=old.t;
+          if (!had && nu.relates.length) { nu.opened=Date.now(); opened.push(nu); }
+          FAVS[id]=nu;
+        }
+      }).catch(function(){});
+    });
+  }, Promise.resolve()).then(function(){
+    refreshing=false; saveFavs(); scheduleSync();
+    if (S.mode==="saved") { S.items=savedItems(); render(); }
+    if (opened.length) {
+      var msg = opened.length===1 ? "「"+opened[0].name+"」 예매가 열렸어요!" : "찜한 공연 "+opened.length+"개의 예매가 열렸어요!";
+      toast(msg); localNotify("예매가 열렸어요", opened.map(function(o){return o.name}).join(", "), opened.length===1?"/?show="+encodeURIComponent(opened[0].id):"/?mode=saved");
+    }
+  });
+}
+function localNotify(title, body, url){
+  if (!("Notification" in window) || Notification.permission!=="granted" || !navigator.serviceWorker) return;
+  navigator.serviceWorker.getRegistration().then(function(reg){
+    if (reg) reg.showNotification(title, {body:body, icon:"/icons/icon-192.png", tag:"local-open", data:{url:url}});
+  }).catch(function(){});
+}
+
+// ---------- 찜 동기화 ----------
+function mergeFavs(a, b){
+  var favs={}, removed={}, srcs=[a,b], id;
+  srcs.forEach(function(s){
+    for (id in (s.removed||{})) removed[id]=Math.max(removed[id]||0, s.removed[id]);
+    for (id in (s.favs||{})) {
+      var it=s.favs[id], cur=favs[id];
+      if (!cur) favs[id]=it;
+      else { var nw=(it.u||0)>(cur.u||0)?it:cur; favs[id]=Object.assign({}, nw, {t:Math.max(it.t||0,cur.t||0), opened:Math.max(it.opened||0,cur.opened||0)}); }
+    }
+  });
+  for (id in favs) { if (removed[id]!==undefined && removed[id]>=(favs[id].t||0)) delete favs[id]; else delete removed[id]; }
+  return {favs:favs, removed:removed};
+}
+var syncT, syncing=false, syncAgain=false;
+function scheduleSync(){ if(!SYNC) return; clearTimeout(syncT); syncT=setTimeout(syncNow, 1200); }
+function syncNow(){
+  if (!SYNC) return Promise.resolve();
+  if (syncing) { syncAgain=true; return Promise.resolve(); }
+  syncing=true;
+  var sentAt=Date.now();
+  return api("/api/favs", {action:"sync", code:SYNC, data:{favs:FAVS, removed:REMOVED}}).then(function(j){
+    var m=mergeFavs(j.data, {favs:FAVS, removed:REMOVED}); // 요청 사이에 바뀐 내용도 지켜요
+    FAVS=m.favs; REMOVED=m.removed; saveFavs();
+    S.syncMsg="마지막 동기화: "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
+  }).catch(function(e){
+    S.syncMsg = e.status===404 ? "이 동기화 코드를 서버에서 찾지 못했어요. 동기화를 끄고 다시 켜 주세요." : "동기화하지 못했어요: "+e.message;
+  }).then(function(){
+    syncing=false;
+    if (S.mode==="saved") { S.items=savedItems(); render(); }
+    if (syncAgain) { syncAgain=false; scheduleSync(); }
+  });
+}
+function startSync(){
+  S.busy="sync"; render();
+  return api("/api/favs", {action:"create", data:{favs:FAVS, removed:REMOVED}}).then(function(j){
+    SYNC=j.code; lsSet(CKEY, SYNC); FAVS=j.data.favs; REMOVED=j.data.removed; saveFavs();
+    S.syncMsg="동기화를 켰어요. 다른 기기에서 위 코드를 입력하거나 연결 링크를 열어 주세요.";
+    return true;
+  }).catch(function(e){ S.syncMsg=e.message; return false; }).then(function(ok){ S.busy=""; render(); return ok; });
+}
+function joinSync(code){
+  code=String(code||"").toUpperCase().replace(/[^0-9A-Z]/g,"");
+  if (!/^[2-9A-HJ-NP-Z]{12}$/.test(code)) { S.syncMsg="코드는 12글자예요 (예: K7QF-2MXP-9TZA)."; render(); return; }
+  code=code.slice(0,4)+"-"+code.slice(4,8)+"-"+code.slice(8);
+  var prev=SYNC; SYNC=code; S.busy="sync"; render();
+  api("/api/favs", {action:"sync", code:code, data:{favs:FAVS, removed:REMOVED}}).then(function(j){
+    lsSet(CKEY, SYNC); FAVS=j.data.favs; REMOVED=j.data.removed; saveFavs();
+    S.syncMsg="연결했어요. 이제 이 기기의 찜도 함께 동기화돼요.";
+    if (PUSH && prev && prev!==code) { disablePush(true, prev); S.pushMsg="다른 코드로 바꿔서 알림이 꺼졌어요. 다시 켜 주세요."; }
+  }).catch(function(e){ SYNC=prev; S.syncMsg=e.message; }).then(function(){ S.busy=""; if(S.mode==="saved") S.items=savedItems(); render(); });
+}
+function stopSync(){
+  if (!confirm("이 기기의 찜 동기화를 끌까요? 찜 목록은 이 기기에 그대로 남아요.")) return;
+  var p = PUSH ? disablePush(true) : Promise.resolve();
+  p.then(function(){ SYNC=null; lsSet(CKEY, null); S.syncMsg="동기화를 껐어요."; render(); });
+}
+
+// ---------- 예매 오픈 알림 (웹 푸시) ----------
+function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1); }
+function isStandalone(){ return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone===true; }
+function pushSupport(){
+  if (!("serviceWorker" in navigator)) return "이 브라우저는 알림을 지원하지 않아요.";
+  if (!("PushManager" in window) || !("Notification" in window)) {
+    return isIOS() && !isStandalone() ? "아이폰·아이패드는 Safari 공유 버튼 → '홈 화면에 추가'로 앱을 설치한 뒤, 앱에서 알림을 켤 수 있어요." : "이 브라우저는 알림을 지원하지 않아요.";
+  }
+  return "";
+}
+function b64ToBytes(s){
+  var pad="=".repeat((4-s.length%4)%4), raw=atob((s+pad).replace(/-/g,"+").replace(/_/g,"/")), out=new Uint8Array(raw.length);
+  for (var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+function enablePush(){
+  var why=pushSupport(); if (why) { S.pushMsg=why; render(); return; }
+  S.busy="push"; render();
+  var key;
+  api("/api/push").then(function(j){ key=j.publicKey; })
+  .then(function(){ return SYNC ? true : startSync(); })
+  .then(function(ok){ if(!ok) throw new Error(S.syncMsg||"동기화를 켜지 못했어요."); return Notification.requestPermission(); })
+  .then(function(perm){ if (perm!=="granted") throw new Error("알림 권한이 꺼져 있어요. 브라우저(또는 휴대폰) 설정에서 이 사이트의 알림을 허용해 주세요."); return navigator.serviceWorker.ready; })
+  .then(function(reg){ return reg.pushManager.getSubscription().then(function(s){ return s || reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64ToBytes(key)}); }); })
+  .then(function(sub){ return api("/api/push", {action:"subscribe", code:SYNC, subscription:sub.toJSON()}).then(function(){ return sub; }); })
+  .then(function(sub){ PUSH=sub.endpoint; lsSet(PKEY, PUSH); S.pushMsg="알림을 켰어요. 매일 아침 찜한 공연을 확인해서 예매가 열리거나 곧 끝나면 알려 드려요."; })
+  .catch(function(e){
+    if (e.status===503) {
+      S.pushMsg="서버에 푸시 알림이 설정되지 않았어요. 대신 앱을 열 때 예매가 열린 공연을 알려 드려요.";
+      if ("Notification" in window && Notification.permission==="default") Notification.requestPermission();
+    } else S.pushMsg = e.status ? e.message : e.name==="NotAllowedError" ? "브라우저가 알림 등록을 막았어요. 시크릿 창이 아닌지, 알림 권한이 허용돼 있는지 확인해 주세요."
+      : (e.message && /[가-힣]/.test(e.message)) ? e.message : "알림을 켜지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+  })
+  .then(function(){ S.busy=""; render(); });
+}
+function disablePush(quiet, codeOverride){
+  var endpoint=PUSH, code=codeOverride||SYNC;
+  PUSH=null; lsSet(PKEY, null);
+  var p = navigator.serviceWorker ? navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager && reg.pushManager.getSubscription(); }).then(function(s){ return s && s.unsubscribe(); }).catch(function(){}) : Promise.resolve();
+  return p.then(function(){ return code && endpoint ? api("/api/push", {action:"unsubscribe", code:code, endpoint:endpoint}).catch(function(){}) : null; })
+    .then(function(){ if(!quiet) { S.pushMsg="알림을 껐어요."; render(); } });
+}
+function testPush(){
+  S.busy="push"; render();
+  api("/api/push", {action:"test", code:SYNC}).then(function(j){ S.pushMsg = j.sent ? "시험 알림을 보냈어요. 잠시 뒤 도착해요." : "연결된 기기가 없어요. 알림을 다시 켜 주세요."; })
+  .catch(function(e){ S.pushMsg=e.message; }).then(function(){ S.busy=""; render(); });
+}
+function savedPanel(){
+  var h='<div class="box"><h4>찜 동기화</h4>';
+  if (SYNC) {
+    h+='<p>같은 코드를 쓰는 기기끼리 찜 목록이 합쳐져요.</p><div class="row"><span class="code">'+esc(SYNC)+'</span></div>'+
+      '<div class="row"><button class="btn" data-act="sync-share">연결 링크 보내기</button><button class="btn g" data-act="sync-now"'+(S.busy?' disabled':'')+'>지금 동기화</button><button class="btn g" data-act="sync-stop">동기화 끄기</button></div>';
+  } else {
+    h+='<p>휴대폰과 컴퓨터처럼 여러 기기에서 같은 찜 목록을 보려면 동기화를 켜세요. 로그인 없이 코드로 연결해요.</p>'+
+      '<div class="row"><button class="btn" data-act="sync-start"'+(S.busy?' disabled':'')+'>동기화 켜기</button></div>'+
+      '<div class="row"><input type="text" id="joinCode" placeholder="다른 기기의 코드 입력" maxlength="20" aria-label="동기화 코드" autocomplete="off"><button class="btn g" data-act="sync-join"'+(S.busy?' disabled':'')+'>연결</button></div>';
+  }
+  if (S.syncMsg) h+='<p style="margin:6px 0 0">'+esc(S.syncMsg)+'</p>';
+  h+='</div><div class="box"><h4>예매 오픈 알림</h4><p>예매처가 아직 없는 찜 공연에 예매처가 생기거나, 공연이 7일 안에 끝나면 알려 드려요.</p>';
+  var why=pushSupport();
+  if (PUSH) h+='<div class="row"><button class="btn g" data-act="push-test"'+(S.busy?' disabled':'')+'>시험 알림</button><button class="btn g" data-act="push-off">알림 끄기</button></div>';
+  else if (why) h+='<p style="margin:0">'+esc(why)+'</p>';
+  else h+='<div class="row"><button class="btn" data-act="push-on"'+(S.busy?' disabled':'')+'>알림 켜기</button></div>';
+  if (S.pushMsg) h+='<p style="margin:6px 0 0">'+esc(S.pushMsg)+'</p>';
+  return h+'</div>';
+}
+
+// ---------- 공연 상세 ----------
+var DETAIL=null, detailRun=0;
+function openDetail(id, push){
+  var base=findItem(id);
+  DETAIL = Object.assign({id:id, loading:true}, base||{});
+  var run=++detailRun;
+  renderDetail();
+  if (!$("dlg").open) $("dlg").showModal();
+  if (push!==false) {
+    var u=new URL(location.href); u.searchParams.set("show", id);
+    history.pushState({show:id}, "", u.pathname+u.search);
+  }
+  api("/api/detail?ids="+encodeURIComponent(id)).then(function(j){
+    if (run!==detailRun) return;
+    var d=j.items[id]; if(!d) throw new Error("공연 정보를 찾지 못했어요.");
+    DETAIL=Object.assign({}, base||{}, d, {loading:false, rank:base&&base.rank, seats:base&&base.seats});
+  }).catch(function(e){
+    if (run!==detailRun) return;
+    DETAIL.loading=false; DETAIL.err=e.message;
+  }).then(function(){ if (run===detailRun) renderDetail(); });
+}
+function closeDetail(){
+  if (history.state && history.state.show) { history.back(); return; }
+  hideDetail();
+  var u=new URL(location.href); u.searchParams.delete("show"); history.replaceState(null, "", u.pathname+u.search);
+}
+function hideDetail(){ detailRun++; DETAIL=null; if ($("dlg").open) $("dlg").close(); }
+function renderDetail(){
+  var x=DETAIL; if(!x) return;
+  var fav=!!FAVS[x.id], links=linkBtns(x);
+  function row(k,v){ return v ? '<dt>'+k+'</dt><dd>'+esc(v)+'</dd>' : ''; }
+  var h='<button class="x" data-act="close" aria-label="닫기">×</button>';
+  h+='<div class="hero">'+(x.poster?'<img alt="" referrerpolicy="no-referrer" src="'+esc(https(x.poster))+'" onerror="this.style.visibility=\'hidden\'">':'')+
+    '<div><h3>'+esc(x.name||"공연 정보")+'</h3><div class="meta">'+esc(x.venue||"")+(x.start?'<br>'+esc(x.start)+' ~ '+esc(x.end):'')+'</div>'+
+    (priceText(x)?'<div class="price">'+priceText(x)+'</div>':'')+badges(x)+'</div></div>';
+  if (x.loading) h+='<p class="none">자세한 정보를 불러오는 중이에요…</p>';
+  if (x.err) h+='<p class="none" style="color:var(--warn)">'+esc(x.err)+'</p>';
+  h+='<dl>'+row("공연 시간", x.time)+row("러닝타임", x.runtime)+row("관람 연령", x.age)+row("출연", x.cast)+row("제작진", x.crew)+row("주최·기획", x.company)+row("가격", x.price)+'</dl>';
+  h+= links ? '<div class="links">'+links+'</div>' : (x.loading ? '' : '<div class="none">예매처 미정. 찜하고 알림을 켜 두면 예매가 열릴 때 알려 드려요.</div>');
+  h+='<div class="acts"><button class="btn g" data-fav="'+esc(x.id)+'" aria-pressed="'+fav+'">'+(fav?'♥ 찜 해제':'♡ 찜하기')+'</button><button class="btn g" data-act="share-show">🔗 이 공연 공유</button></div>';
+  if (x.story) h+='<div class="story">'+esc(x.story.replace(/<[^>]+>/g," ").slice(0,1500))+'</div>';
+  if (x.images && x.images.length) h+='<div class="imgs">'+x.images.filter(safeUrl).map(function(u){return '<img loading="lazy" referrerpolicy="no-referrer" alt="" src="'+esc(https(u))+'" onerror="this.remove()">'}).join("")+'</div>';
+  $("dlgBody").innerHTML=h;
+}
+
+// ---------- 앱 설치 ----------
+var installEvt=null;
+window.addEventListener("beforeinstallprompt", function(e){ e.preventDefault(); installEvt=e; $("install").hidden=false; });
+window.addEventListener("appinstalled", function(){ installEvt=null; $("install").hidden=true; toast("앱을 설치했어요."); });
+if (isIOS() && !isStandalone()) $("install").hidden=false;
+$("install").addEventListener("click", function(){
+  if (installEvt) { installEvt.prompt(); installEvt.userChoice.then(function(){ installEvt=null; $("install").hidden=true; }); }
+  else toast("Safari 아래쪽 공유 버튼 → '홈 화면에 추가'를 눌러 주세요.");
+});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function(){});
+
+// ---------- 이벤트 ----------
 $("cats").addEventListener("click",function(e){var b=e.target.closest("[data-i]");if(!b)return;S.cat=+b.dataset.i;renderCats();load()});
 $("period").addEventListener("change",load);
 $("go").addEventListener("click",load);
 $("q").addEventListener("keydown",function(e){if(e.key==="Enter")load()});
-$("view").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;S.view=b.dataset.v;
-  Array.prototype.forEach.call($("view").children,function(x){x.setAttribute("aria-pressed",String(x===b))});render()});
-$("mode").addEventListener("click",function(e){var b=e.target.closest("[data-m]");if(!b)return;S.mode=b.dataset.m;
-  Array.prototype.forEach.call($("mode").children,function(x){x.setAttribute("aria-pressed",String(x===b))});$("modeNote").textContent=NOTES[S.mode];load()});
-$("modeNote").textContent=NOTES[S.mode];
-$("budget").addEventListener("change",render);
-$("out").addEventListener("click",function(e){
-  var b=e.target.closest("[data-fav]"); if(!b) return;
-  var id=b.dataset.fav;
-  if(FAVS[id]) delete FAVS[id];
-  else { var x=S.items.filter(function(i){return i.id===id})[0]; if(x) FAVS[id]={id:x.id,name:x.name,start:x.start,end:x.end,venue:x.venue,area:x.area,poster:x.poster,genre:x.genre,relates:x.relates,minPrice:x.minPrice,maxPrice:x.maxPrice}; }
-  saveFavs();
-  if(S.mode==="saved") load(); else render();
+$("view").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;S.view=b.dataset.v;setPressed("view","v",S.view);syncUrl();render()});
+$("mode").addEventListener("click",function(e){var b=e.target.closest("[data-m]");if(!b)return;S.mode=b.dataset.m;setPressed("mode","m",S.mode);$("modeNote").textContent=NOTES[S.mode];load()});
+$("budget").addEventListener("change",function(){syncUrl();render()});
+$("share").addEventListener("click",function(){ shareLink(location.origin+stateUrl(), "공연 모아보기"); });
+function onAction(e){
+  var t=e.target;
+  var f=t.closest("[data-fav]"); if(f){ e.stopPropagation(); toggleFav(f.dataset.fav); return; }
+  var a=t.closest("[data-act]");
+  if(a){
+    var act=a.dataset.act;
+    if(act==="close") closeDetail();
+    else if(act==="share-show" && DETAIL) shareLink(location.origin+"/?show="+encodeURIComponent(DETAIL.id), DETAIL.name);
+    else if(act==="sync-start") startSync();
+    else if(act==="sync-join") joinSync(($("joinCode")||{}).value);
+    else if(act==="sync-now") syncNow();
+    else if(act==="sync-stop") stopSync();
+    else if(act==="sync-share") shareLink(location.origin+"/?mode=saved&sync="+encodeURIComponent(SYNC), "공연 모아보기 찜 동기화");
+    else if(act==="push-on") enablePush();
+    else if(act==="push-off") disablePush();
+    else if(act==="push-test") testPush();
+    return;
+  }
+  if (t.closest("a")) return;
+  var o=t.closest("[data-open]"); if(o) openDetail(o.dataset.open);
+}
+$("out").addEventListener("click", onAction);
+$("dlgBody").addEventListener("click", onAction);
+$("out").addEventListener("keydown", function(e){ if(e.key==="Enter" && e.target.id==="joinCode") joinSync(e.target.value); });
+$("dlg").addEventListener("click", function(e){ if(e.target===$("dlg")) closeDetail(); }); // 바깥 누르면 닫기
+$("dlg").addEventListener("cancel", function(e){ e.preventDefault(); closeDetail(); }); // Esc
+window.addEventListener("popstate", function(){
+  var id=new URLSearchParams(location.search).get("show");
+  if (id) openDetail(id, false); else hideDetail();
 });
-renderCats();load();
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible"){ syncNow(); refreshFavs(); } });
+
+// ---------- 시작 ----------
+var P0=readUrl();
+setPressed("mode","m",S.mode); setPressed("view","v",S.view);
+$("modeNote").textContent=NOTES[S.mode];
+renderCats();
+var joinParam=P0.get("sync");
+if (joinParam) {
+  var u0=new URL(location.href); u0.searchParams.delete("sync"); history.replaceState(null,"",u0.pathname+u0.search);
+  if (joinParam!==SYNC && confirm("이 기기를 찜 동기화 코드 "+joinParam+"에 연결할까요?\n두 기기의 찜 목록이 합쳐져요.")) joinSync(joinParam);
+}
+load();
+if (P0.get("show")) openDetail(P0.get("show").slice(0,20), false);
+syncNow().then(function(){ refreshFavs(); });
 </script>
 </body>
 </html>
