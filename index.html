@@ -90,7 +90,7 @@ var CATS = [
   {label:"클래식", genre:"CCCA"},
   {label:"국악", genre:"CCCC"},
   {label:"대중음악", genre:"CCCD"},
-  {label:"트로트 (부모님)", genre:"CCCD", q:"트로트"}
+  {label:"트로트 (부모님)", genre:"CCCD", tag:"trot"}
 ];
 var S = {cat:0, view:"list", mode:"popular", items:[], done:true, err:"", found:0};
 var NOTES = {popular:"최근 30일 예매 순위 순서예요. 예매처가 있는 공연만 보여요.", upcoming:"아직 시작하지 않은 공연이에요. 예매처가 아직 없는 공연도 함께 보여요."};
@@ -137,7 +137,7 @@ function load(){
   var run=++RUN, c=CATS[S.cat], off=+$("period").value, qv=$("q").value.trim()||c.q||"";
   var a=new Date();a.setDate(a.getDate()+off);
   var b=new Date(a.getTime());b.setDate(b.getDate()+30);
-  var base="/api/shows?mode="+S.mode+"&from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"");
+  var base="/api/shows?mode="+S.mode+"&from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"")+(c.tag?"&tag="+c.tag:"");
   var page=1, offset=0, seen={};
   S.items=[];S.done=false;S.err="";render();
   function step(){
