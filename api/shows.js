@@ -4,6 +4,11 @@ const MUSICAL_MIN_SEATS = 1000; // 뮤지컬은 이 좌석 수 이상만
 const REGIONS = ["서울", "경기"]; // 이 지역 공연장만
 const AREA_CODES = ["11", "41"]; // 뮤지컬 예매상황판 지역 코드 (서울 11, 경기 41)
 const PAGE_ROWS = 30;
+// 트로트 판별용 단어 (공연명이나 출연진에 들어 있으면 트로트로 봄). 자유롭게 추가하세요.
+const TROT_WORDS = ["트로트", "트롯", "가요무대", "효콘서트", "임영웅", "송가인", "영탁", "이찬원", "장민호", "정동원",
+  "김호중", "김희재", "양지은", "홍지윤", "김다현", "전유진", "박서진", "손태진", "안성훈", "진해성", "장윤정",
+  "홍진영", "진성", "나훈아", "남진", "설운도", "태진아", "주현미", "김연자", "조항조", "박현빈", "김용빈", "박지현"];
+const isTrot = (it) => TROT_WORDS.some((w) => (it.name + " " + (it.cast || "")).includes(w));
 const CONCURRENCY = 2;
 const GAP_MS = 200; // KOPIS 호출 사이 최소 간격
 const TIME_BUDGET = 7000;
@@ -73,7 +78,7 @@ function getDetail(id) {
         return { name: friendly(tag(r, "relatenm"), url), url };
       })
       .filter((r) => r.name && !seen[r.name] && (seen[r.name] = true));
-    return { relates, venue: tag(x, "fcltynm"), mt10id: tag(x, "mt10id") };
+    return { relates, venue: tag(x, "fcltynm"), mt10id: tag(x, "mt10id"), cast: tag(x, "prfcast") };
   });
 }
 function getFacility(mt10id) {
@@ -130,6 +135,8 @@ module.exports = async (req, res) => {
     const page = Math.min(Math.max(parseInt(one(req.query.page), 10) || 1, 1), 30);
     const offset = Math.max(parseInt(one(req.query.offset), 10) || 0, 0);
     const mode = String(one(req.query.mode));
+    const trot = String(one(req.query.tag)) === "trot";
+    const nameQ = trot ? "" : q;
 
     if (genre && !/^[A-Z]{4}$/.test(genre)) return res.status(400).json({ error: "장르 코드 형식이 올바르지 않아요." });
     if (!/^\d{8}$/.test(from) || !/^\d{8}$/.test(to)) return res.status(400).json({ error: "날짜는 YYYYMMDD 형식이어야 해요." });
@@ -147,10 +154,10 @@ module.exports = async (req, res) => {
       all = lists.filter((x) => x.id && !seenId[x.id] && (seenId[x.id] = true));
       regional = all
         .map((x) => Object.assign({}, x, { relates: [] }))
-        .filter((x) => toNum(x.end) >= from && toNum(x.start) <= to && (!q || x.name.includes(q)));
+        .filter((x) => toNum(x.end) >= from && toNum(x.start) <= to && (!nameQ || x.name.includes(nameQ)));
     } else {
-      const xml = await cached("l:" + [from, to, genre, q, page].join("|"), () =>
-        kopis("/pblprfr", { stdate: from, eddate: to, cpage: String(page), rows: String(PAGE_ROWS), shcate: genre, shprfnm: q, prfstate: "01" })
+      const xml = await cached("l:" + [from, to, genre, nameQ, page].join("|"), () =>
+        kopis("/pblprfr", { stdate: from, eddate: to, cpage: String(page), rows: String(PAGE_ROWS), shcate: genre, shprfnm: nameQ, prfstate: "01" })
       );
       all = blocks(xml, "db").map((b) => ({
         id: tag(b, "mt20id"),
@@ -175,6 +182,7 @@ module.exports = async (req, res) => {
         try {
           const d = await getDetail(it.id);
           it.relates = d.relates;
+          it.cast = d.cast;
           if (d.venue) it.venue = d.venue;
           if (!popular && it.genre === "뮤지컬" && d.mt10id) {
             try {
@@ -197,6 +205,7 @@ module.exports = async (req, res) => {
     const shown = done.filter(
       (it) =>
         it.checked &&
+        (!trot || isTrot(it)) &&
         (popular ? it.relates.length > 0 : it.genre !== "뮤지컬" || (it.seats || 0) >= MUSICAL_MIN_SEATS)
     );
     let next = null;
