@@ -74,10 +74,17 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
 .box .row{margin:6px 0}
 .box + .box{margin-top:-4px}
 .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:16px;letter-spacing:1px}
-#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
 #toast.on{opacity:1}
 dialog{border:none;padding:0;border-radius:18px;background:var(--paper);color:var(--ink);width:min(560px,calc(100% - 24px));max-height:calc(100% - 40px)}
 dialog::backdrop{background:rgba(10,14,40,.55)}
+dialog{overflow:auto}
+dialog:not([open]){display:none}
+/* <dialog>를 지원하지 않는 브라우저(iOS 15.3 이하 등)용 */
+dialog.fb{display:block;position:fixed;top:20px;left:0;right:0;margin:0 auto;z-index:31;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+#dlgBg{position:fixed;inset:0;background:rgba(10,14,40,.55);z-index:30}
+#linkbox{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(520px,calc(100% - 24px));background:var(--paper);color:var(--ink);border:2px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:41;font-size:14px}
+#linkbox input{width:100%;margin:8px 0}
 .dlg{padding:16px 16px 20px;position:relative}
 .dlg .x{all:unset;cursor:pointer;position:absolute;top:10px;right:12px;font-size:26px;line-height:1;padding:4px 8px;color:var(--muted)}
 .dlg h3{margin:0 40px 6px 0;font-size:20px;line-height:1.35;word-break:keep-all}
@@ -134,7 +141,9 @@ dialog::backdrop{background:rgba(10,14,40,.55)}
   <div id="out" role="status" aria-live="polite"></div>
   <div class="foot">출처: 공연예술통합전산망(KOPIS). 예매 일정과 좌석 현황은 각 예매처에서 꼭 다시 확인하세요.</div>
 </main>
-<dialog id="dlg" aria-label="공연 상세"><div class="dlg" id="dlgBody"></div></dialog>
+<div id="dlgBg" hidden></div>
+<dialog id="dlg" aria-label="공연 상세" aria-modal="true"><div class="dlg" id="dlgBody"></div></dialog>
+<div id="linkbox" hidden role="dialog" aria-label="링크 복사"><b>이 링크를 길게 눌러 복사하세요</b><input type="text" id="linkboxInput" readonly aria-label="공유 링크"><button class="btn g" id="linkboxClose">닫기</button></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -181,13 +190,36 @@ function api(url, body){
   var opt = body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {};
   return fetch(url, opt).then(function(r){ return r.json().catch(function(){return {}}).then(function(j){ if(!r.ok){ var e=new Error(j.error||"요청에 실패했어요."); e.status=r.status; throw e; } return j; }); });
 }
+// 상세 창이 열려 있으면(브라우저 최상단 레이어) 그 안에 붙여야 알림·링크 상자가 보여요.
+function onTop(el){ var host = NATIVE_DLG && dlgIsOpen() ? $("dlg") : document.body; if (el.parentNode!==host) host.appendChild(el); return el; }
 var toastT;
-function toast(msg){ var t=$("toast"); t.textContent=msg; t.className="on"; clearTimeout(toastT); toastT=setTimeout(function(){t.className=""},2600); }
+function toast(msg){ var t=onTop($("toast")); t.textContent=msg; t.className="on"; clearTimeout(toastT); toastT=setTimeout(function(){t.className=""},2600); }
+function showLinkBox(url){
+  var box=onTop($("linkbox")), inp=$("linkboxInput");
+  inp.value=url; box.hidden=false;
+  try { inp.focus(); inp.select(); inp.setSelectionRange(0, url.length); } catch (e) {}
+}
+function legacyCopy(text){
+  try {
+    var ta=document.createElement("textarea"); ta.value=text; ta.setAttribute("readonly","");
+    ta.style.cssText="position:fixed;top:0;left:0;opacity:0"; onTop(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    var ok=document.execCommand("copy"); ta.parentNode.removeChild(ta); return ok;
+  } catch (e) { return false; }
+}
+function copyLink(url){
+  function done(ok){ if (ok) toast("링크를 복사했어요. 원하는 곳에 붙여 넣으세요."); else showLinkBox(url); }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function(){done(true)}, function(){done(legacyCopy(url))});
+  else done(legacyCopy(url));
+}
+// 공유 창 → (안 되면) 클립보드 복사 → (그것도 안 되면) 직접 복사할 수 있게 링크 상자를 보여 줘요.
 function shareLink(url, title){
-  if (navigator.share) { navigator.share({title:title||document.title, url:url}).catch(function(){}); return; }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(function(){toast("링크를 복사했어요.")}, function(){window.prompt("이 링크를 복사하세요.", url)});
-  } else window.prompt("이 링크를 복사하세요.", url);
+  if (navigator.share) {
+    try {
+      navigator.share({title:title||document.title, url:url}).catch(function(e){ if (!e || e.name!=="AbortError") copyLink(url); });
+      return;
+    } catch (e) { /* 아래로 */ }
+  }
+  copyLink(url);
 }
 
 // ---------- 공유 링크 (주소에 필터 담기) ----------
@@ -490,7 +522,7 @@ function openDetail(id, push){
   DETAIL = Object.assign({id:id, loading:true}, base||{});
   var run=++detailRun;
   renderDetail();
-  if (!$("dlg").open) $("dlg").showModal();
+  if (!dlgIsOpen()) showDlg();
   if (push!==false) {
     var u=new URL(location.href); u.searchParams.set("show", id);
     history.pushState({show:id}, "", u.pathname+u.search);
@@ -509,7 +541,19 @@ function closeDetail(){
   hideDetail();
   var u=new URL(location.href); u.searchParams.delete("show"); history.replaceState(null, "", u.pathname+u.search);
 }
-function hideDetail(){ detailRun++; DETAIL=null; if ($("dlg").open) $("dlg").close(); }
+function hideDetail(){ detailRun++; DETAIL=null; if (dlgIsOpen()) hideDlg(); }
+var NATIVE_DLG = typeof $("dlg").showModal === "function";
+function dlgIsOpen(){ return $("dlg").hasAttribute("open"); }
+function showDlg(){
+  if (NATIVE_DLG) { $("dlg").showModal(); return; }
+  $("dlg").classList.add("fb"); $("dlg").setAttribute("open",""); $("dlgBg").hidden=false; document.body.style.overflow="hidden";
+}
+function hideDlg(){
+  $("linkbox").hidden=true;
+  if (NATIVE_DLG) { $("dlg").close(); }
+  else { $("dlg").removeAttribute("open"); $("dlgBg").hidden=true; document.body.style.overflow=""; }
+  onTop($("toast")); onTop($("linkbox"));
+}
 function renderDetail(){
   var x=DETAIL; if(!x) return;
   var fav=!!FAVS[x.id], links=linkBtns(x);
@@ -574,6 +618,13 @@ $("dlgBody").addEventListener("click", onAction);
 $("out").addEventListener("keydown", function(e){ if(e.key==="Enter" && e.target.id==="joinCode") joinSync(e.target.value); });
 $("dlg").addEventListener("click", function(e){ if(e.target===$("dlg")) closeDetail(); }); // 바깥 누르면 닫기
 $("dlg").addEventListener("cancel", function(e){ e.preventDefault(); closeDetail(); }); // Esc
+$("dlgBg").addEventListener("click", closeDetail);
+document.addEventListener("keydown", function(e){
+  if (e.key!=="Escape") return;
+  if (!$("linkbox").hidden) { $("linkbox").hidden=true; return; }
+  if (!NATIVE_DLG && dlgIsOpen()) closeDetail();
+});
+$("linkboxClose").addEventListener("click", function(){ $("linkbox").hidden=true; });
 window.addEventListener("popstate", function(){
   var id=new URLSearchParams(location.search).get("show");
   if (id) openDetail(id, false); else hideDetail();

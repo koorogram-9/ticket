@@ -1,5 +1,5 @@
 // 서비스 워커: 앱 설치, 오프라인 화면, 푸시 알림
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = "shell-" + VERSION;
 const API = "api-" + VERSION;
 const API_MAX = 60;
