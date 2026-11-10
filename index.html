@@ -54,8 +54,12 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
 <body>
 <main class="wrap">
   <h1>공연 모아보기</h1>
-  <p class="sub">서울·경기 공연장에서 예매처가 있는 공연만 모아 보여 줘요. 뮤지컬은 대극장만 보여요.</p>
+  <p class="sub">서울·경기 공연장만 보여 줘요. 뮤지컬은 대극장만 보여요.</p>
 
+  <div class="row"><span class="lab">구분</span>
+    <div class="seg" id="mode"><button data-m="popular" aria-pressed="true">인기 공연</button><button data-m="upcoming" aria-pressed="false">공연 예정</button></div>
+  </div>
+  <p class="sub" id="modeNote" style="margin:0 0 6px;font-size:13px"></p>
   <div class="row"><span class="lab">종류</span><div class="row" id="cats" style="margin:0"></div></div>
   <div class="row"><span class="lab">기간</span>
     <select id="period" aria-label="기간 선택">
@@ -77,6 +81,8 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
 </main>
 
 <script>
+// 종류 설정: label(버튼 이름), genre(KOPIS 장르 코드), q(공연명 키워드, 선택)
+// 장르 코드는 KOPIS 오픈API 문서에서 꼭 확인하고, 필요하면 아래 목록을 고쳐 쓰세요.
 var CATS = [
   {label:"전체"},
   {label:"뮤지컬", genre:"GGGA"},
@@ -86,8 +92,9 @@ var CATS = [
   {label:"대중음악", genre:"CCCD"},
   {label:"트로트 (부모님)", genre:"CCCD", q:"트로트"}
 ];
-var S = {cat:0, view:"list", items:[], done:true, err:"", found:0};
-var MAX_PAGES = 10, RUN = 0;
+var S = {cat:0, view:"list", mode:"popular", items:[], done:true, err:"", found:0};
+var NOTES = {popular:"최근 30일 예매 순위 순서예요. 예매처가 있는 공연만 보여요.", upcoming:"아직 시작하지 않은 공연이에요. 예매처가 아직 없는 공연도 함께 보여요."};
+var MAX_PAGES = 5, RUN = 0;
 var $ = function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function safeUrl(u){return /^https?:\/\//i.test(u||"")?u:""}
@@ -105,9 +112,10 @@ function card(x){
   }).join("");
   return '<div class="card">'+poster+'<div class="info"><h3>'+esc(x.name)+'</h3>'+
     '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+
+    (S.mode==="popular"&&x.rank&&x.rank<999?'<span class="tag" style="background:var(--pick);color:var(--pickink)">'+esc((x.area||"").slice(0,2))+' '+x.rank+'위</span>':'')+
     '<span class="tag">'+esc(x.genre)+'</span>'+(x.seats?'<span class="tag">'+x.seats.toLocaleString("ko-KR")+'석</span>':'')+
     '<span class="tag">'+esc((x.area||"").replace(/특별시|광역시|도$/,""))+'</span>'+
-    (links?'<div class="links">'+links+'</div>':'')+'</div></div>';
+    (links?'<div class="links">'+links+'</div>':'<div class="none">예매처 미정</div>')+'</div></div>';
 }
 function render(){
   var head = S.err ? '<div class="state err">'+esc(S.err)+'</div>'
@@ -129,7 +137,7 @@ function load(){
   var run=++RUN, c=CATS[S.cat], off=+$("period").value, qv=$("q").value.trim()||c.q||"";
   var a=new Date();a.setDate(a.getDate()+off);
   var b=new Date(a.getTime());b.setDate(b.getDate()+30);
-  var base="/api/shows?from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"");
+  var base="/api/shows?mode="+S.mode+"&from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"");
   var page=1, offset=0, seen={};
   S.items=[];S.done=false;S.err="";render();
   function step(){
@@ -139,7 +147,7 @@ function load(){
     .then(function(j){
       if(run!==RUN) return;
       (j.items||[]).forEach(function(x){if(!seen[x.id]){seen[x.id]=1;S.items.push(x)}});
-      S.items.sort(function(p,q){return p.start<q.start?-1:p.start>q.start?1:0});
+      if(S.mode==="upcoming") S.items.sort(function(p,q){return p.start<q.start?-1:p.start>q.start?1:0});
       if(j.next && j.next.page<=MAX_PAGES){page=j.next.page;offset=j.next.offset;render();setTimeout(step,500)}
       else{S.done=true;render()}
     })
@@ -153,6 +161,9 @@ $("go").addEventListener("click",load);
 $("q").addEventListener("keydown",function(e){if(e.key==="Enter")load()});
 $("view").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;S.view=b.dataset.v;
   Array.prototype.forEach.call($("view").children,function(x){x.setAttribute("aria-pressed",String(x===b))});render()});
+$("mode").addEventListener("click",function(e){var b=e.target.closest("[data-m]");if(!b)return;S.mode=b.dataset.m;
+  Array.prototype.forEach.call($("mode").children,function(x){x.setAttribute("aria-pressed",String(x===b))});$("modeNote").textContent=NOTES[S.mode];load()});
+$("modeNote").textContent=NOTES[S.mode];
 renderCats();load();
 </script>
 </body>
