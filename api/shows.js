@@ -78,7 +78,11 @@ function getDetail(id) {
         return { name: friendly(tag(r, "relatenm"), url), url };
       })
       .filter((r) => r.name && !seen[r.name] && (seen[r.name] = true));
-    return { relates, venue: tag(x, "fcltynm"), mt10id: tag(x, "mt10id"), cast: tag(x, "prfcast") };
+    const price = tag(x, "pcseguidance");
+    const nums = (price.match(/[\d,]+\s*원/g) || []).map((v) => num(v)).filter((n) => n >= 1000);
+    const minPrice = nums.length ? Math.min(...nums) : /무료/.test(price) ? 0 : null;
+    const maxPrice = nums.length ? Math.max(...nums) : minPrice;
+    return { relates, venue: tag(x, "fcltynm"), mt10id: tag(x, "mt10id"), cast: tag(x, "prfcast"), price, minPrice, maxPrice };
   });
 }
 function getFacility(mt10id) {
@@ -183,6 +187,9 @@ module.exports = async (req, res) => {
           const d = await getDetail(it.id);
           it.relates = d.relates;
           it.cast = d.cast;
+          it.price = d.price;
+          it.minPrice = d.minPrice;
+          it.maxPrice = d.maxPrice;
           if (d.venue) it.venue = d.venue;
           if (!popular && it.genre === "뮤지컬" && d.mt10id) {
             try {
