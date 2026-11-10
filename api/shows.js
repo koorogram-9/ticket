@@ -1,7 +1,7 @@
 const BASE = process.env.KOPIS_BASE || "http://www.kopis.or.kr/openApi/restful";
 const KEY = process.env.KOPIS_KEY;
 const MUSICAL_MIN_SEATS = 1000; // 뮤지컬은 이 좌석 수 이상인 공연장만 보여줌
-const CONCURRENCY = 6;
+const CONCURRENCY = 3;
 const TIME_BUDGET = 8000; // 이 시간(ms) 안에 확인한 공연만 보여줌
 const cache = new Map();
 
@@ -38,9 +38,13 @@ async function kopis(path, params) {
   const url = new URL(BASE + path);
   url.searchParams.set("service", KEY);
   for (const k in params) if (params[k]) url.searchParams.set(k, params[k]);
-  const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  return r.text();
+  for (let t = 0; ; t++) {
+    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) return r.text();
+    const body = (await r.text()).replace(/\s+/g, " ").slice(0, 150);
+    if (t >= 1) throw new Error("HTTP " + r.status + " " + body);
+    await new Promise((ok) => setTimeout(ok, 500));
+  }
 }
 function cached(key, fn) {
   if (cache.has(key)) return cache.get(key);
@@ -108,22 +112,30 @@ module.exports = async (req, res) => {
       relates: [],
     }));
 
-    let next = 0, failed = 0, lastError = "";
+    const err = { detailFailed: 0, detailError: "", facilityFailed: 0, facilityError: "" };
+    let next = 0;
     async function worker() {
       while (next < items.length && Date.now() - start < TIME_BUDGET) {
         const it = items[next++];
+        let d;
         try {
-          const d = await getDetail(it.id);
-          it.relates = d.relates;
-          if (d.venue) it.venue = d.venue;
-          if (it.genre === "뮤지컬" && d.relates.length && d.mt10id) {
-            it.seats = hallSeats(await getFacility(d.mt10id), d.venue);
-          }
-          it.checked = true;
+          d = await getDetail(it.id);
         } catch (e) {
-          failed++;
-          lastError = e.message;
+          err.detailFailed++;
+          err.detailError = e.message;
+          continue;
         }
+        it.relates = d.relates;
+        if (d.venue) it.venue = d.venue;
+        if (it.genre === "뮤지컬" && d.relates.length && d.mt10id) {
+          try {
+            it.seats = hallSeats(await getFacility(d.mt10id), d.venue);
+          } catch (e) {
+            err.facilityFailed++;
+            err.facilityError = e.message;
+          }
+        }
+        it.checked = true;
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
@@ -140,7 +152,7 @@ module.exports = async (req, res) => {
     );
     res.status(200).json({
       items: shown,
-      stats: { listed: items.length, checked, unchecked, failed, lastError, musicalMinSeats: MUSICAL_MIN_SEATS },
+      stats: { listed: items.length, checked, unchecked, ...err, musicalMinSeats: MUSICAL_MIN_SEATS },
     });
   } catch (e) {
     res.status(502).json({ error: "KOPIS 조회에 실패했어요. 잠시 뒤 다시 시도해 주세요." });
