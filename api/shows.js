@@ -88,24 +88,24 @@ function getFacility(mt10id) {
 }
 const ymd8 = (d) => d.toISOString().slice(0, 10).replace(/-/g, "");
 const toNum = (s) => s.replace(/\D/g, "");
-// 예매상황판에서 서울·경기의 1,000석 이상 공연장 뮤지컬만 가져오기
-async function boxoffice(area) {
+// 예매상황판(인기 순위)에서 지역·장르별로 가져오기. 뮤지컬은 1,000석 이상만
+async function boxoffice(area, cate) {
   const y = new Date(Date.now() + 9 * 3600e3 - 864e5);
   const ed = ymd8(y);
   const sd = ymd8(new Date(y.getTime() - 29 * 864e5));
   const x = await kopis("/boxoffice", {
     ststype: "month", date: ed, stdate: sd, eddate: ed,
-    catecode: "GGGA", area, srchseatscale: "1000",
+    catecode: cate, area, srchseatscale: cate === "GGGA" ? String(MUSICAL_MIN_SEATS) : "",
   });
   return blocks(x, "boxof").map((b) => {
     const pd = tag(b, "prfpd").split("~");
     let poster = tag(b, "poster");
     if (poster.startsWith("/")) poster = "http://www.kopis.or.kr" + poster;
     return {
-      id: tag(b, "mt20id"), name: tag(b, "prfnm"),
+      id: tag(b, "mt20id"), name: tag(b, "prfnm"), rank: num(tag(b, "rnum")) || 999,
       start: (pd[0] || "").trim(), end: (pd[1] || "").trim(),
       venue: tag(b, "prfplcnm"), area: tag(b, "area"), poster,
-      genre: "뮤지컬", state: "", relates: [],
+      genre: tag(b, "cate"), state: "", relates: [],
     };
   });
 }
@@ -129,27 +129,28 @@ module.exports = async (req, res) => {
     const to = String(one(req.query.to));
     const page = Math.min(Math.max(parseInt(one(req.query.page), 10) || 1, 1), 30);
     const offset = Math.max(parseInt(one(req.query.offset), 10) || 0, 0);
+    const mode = String(one(req.query.mode));
 
     if (genre && !/^[A-Z]{4}$/.test(genre)) return res.status(400).json({ error: "장르 코드 형식이 올바르지 않아요." });
     if (!/^\d{8}$/.test(from) || !/^\d{8}$/.test(to)) return res.status(400).json({ error: "날짜는 YYYYMMDD 형식이어야 해요." });
 
     const start = Date.now();
-    const musical = genre === "GGGA" && !q;
+    const popular = mode !== "upcoming";
     let all, regional;
-    if (musical) {
-      const lists = await cached("b:" + new Date().toISOString().slice(0, 10), async () => {
+    if (popular) {
+      const lists = await cached("b:" + genre + ":" + new Date().toISOString().slice(0, 10), async () => {
         const out = [];
-        for (const a of AREA_CODES) out.push(...(await boxoffice(a)));
-        return out;
+        for (const a of AREA_CODES) out.push(...(await boxoffice(a, genre)));
+        return out.sort((p, r) => p.rank - r.rank);
       });
       const seenId = {};
       all = lists.filter((x) => x.id && !seenId[x.id] && (seenId[x.id] = true));
       regional = all
         .map((x) => Object.assign({}, x, { relates: [] }))
-        .filter((x) => toNum(x.end) >= from && toNum(x.start) <= to);
+        .filter((x) => toNum(x.end) >= from && toNum(x.start) <= to && (!q || x.name.includes(q)));
     } else {
       const xml = await cached("l:" + [from, to, genre, q, page].join("|"), () =>
-        kopis("/pblprfr", { stdate: from, eddate: to, cpage: String(page), rows: String(PAGE_ROWS), shcate: genre, shprfnm: q })
+        kopis("/pblprfr", { stdate: from, eddate: to, cpage: String(page), rows: String(PAGE_ROWS), shcate: genre, shprfnm: q, prfstate: "01" })
       );
       all = blocks(xml, "db").map((b) => ({
         id: tag(b, "mt20id"),
@@ -175,7 +176,7 @@ module.exports = async (req, res) => {
           const d = await getDetail(it.id);
           it.relates = d.relates;
           if (d.venue) it.venue = d.venue;
-          if (!musical && it.genre === "뮤지컬" && d.relates.length && d.mt10id) {
+          if (!popular && it.genre === "뮤지컬" && d.mt10id) {
             try {
               it.seats = hallSeats(await getFacility(d.mt10id), d.venue);
             } catch (e) {
@@ -194,18 +195,20 @@ module.exports = async (req, res) => {
 
     const done = regional.slice(offset, i);
     const shown = done.filter(
-      (it) => it.checked && it.relates.length && (musical || it.genre !== "뮤지컬" || (it.seats || 0) >= MUSICAL_MIN_SEATS)
+      (it) =>
+        it.checked &&
+        (popular ? it.relates.length > 0 : it.genre !== "뮤지컬" || (it.seats || 0) >= MUSICAL_MIN_SEATS)
     );
     let next = null;
     if (i < regional.length) next = { page, offset: i };
-    else if (!musical && all.length >= PAGE_ROWS) next = { page: page + 1, offset: 0 };
+    else if (!popular && all.length >= PAGE_ROWS) next = { page: page + 1, offset: 0 };
 
     res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=86400");
     res.status(200).json({
       items: shown,
       next,
       stats: {
-        mode: musical ? "boxoffice" : "list",
+        mode: popular ? "popular" : "upcoming",
         page,
         listed: all.length,
         regional: regional.length,
