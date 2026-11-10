@@ -1,10 +1,15 @@
 const BASE = process.env.KOPIS_BASE || "http://www.kopis.or.kr/openApi/restful";
 const KEY = process.env.KOPIS_KEY;
-const MUSICAL_MIN_SEATS = 1000; // 뮤지컬은 이 좌석 수 이상인 공연장만 보여줌
-const CONCURRENCY = 3;
-const TIME_BUDGET = 8000; // 이 시간(ms) 안에 확인한 공연만 보여줌
+const MUSICAL_MIN_SEATS = 1000; // 뮤지컬은 이 좌석 수 이상만
+const REGIONS = ["서울", "경기"]; // 이 지역 공연장만
+const PAGE_ROWS = 30;
+const CONCURRENCY = 2;
+const GAP_MS = 200; // KOPIS 호출 사이 최소 간격
+const TIME_BUDGET = 7000;
 const cache = new Map();
+let lastCall = 0;
 
+const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 function decode(s) {
   return s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -39,11 +44,15 @@ async function kopis(path, params) {
   url.searchParams.set("service", KEY);
   for (const k in params) if (params[k]) url.searchParams.set(k, params[k]);
   for (let t = 0; ; t++) {
+    const now = Date.now();
+    const wait = Math.max(0, lastCall + GAP_MS - now);
+    lastCall = now + wait;
+    if (wait) await sleep(wait);
     const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
     if (r.ok) return r.text();
-    const body = (await r.text()).replace(/\s+/g, " ").slice(0, 150);
+    const body = (await r.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 80);
     if (t >= 1) throw new Error("HTTP " + r.status + " " + body);
-    await new Promise((ok) => setTimeout(ok, 500));
+    await sleep(1500);
   }
 }
 function cached(key, fn) {
@@ -93,66 +102,76 @@ module.exports = async (req, res) => {
     const q = String(one(req.query.q)).slice(0, 30);
     const from = String(one(req.query.from));
     const to = String(one(req.query.to));
-    const rows = Math.min(Math.max(parseInt(one(req.query.rows), 10) || 100, 1), 100);
+    const page = Math.min(Math.max(parseInt(one(req.query.page), 10) || 1, 1), 30);
+    const offset = Math.max(parseInt(one(req.query.offset), 10) || 0, 0);
 
     if (genre && !/^[A-Z]{4}$/.test(genre)) return res.status(400).json({ error: "장르 코드 형식이 올바르지 않아요." });
     if (!/^\d{8}$/.test(from) || !/^\d{8}$/.test(to)) return res.status(400).json({ error: "날짜는 YYYYMMDD 형식이어야 해요." });
 
     const start = Date.now();
-    const xml = await kopis("/pblprfr", { stdate: from, eddate: to, cpage: "1", rows: String(rows), shcate: genre, shprfnm: q });
-    const items = blocks(xml, "db").map((b) => ({
+    const xml = await cached("l:" + [from, to, genre, q, page].join("|"), () =>
+      kopis("/pblprfr", { stdate: from, eddate: to, cpage: String(page), rows: String(PAGE_ROWS), shcate: genre, shprfnm: q })
+    );
+    const all = blocks(xml, "db").map((b) => ({
       id: tag(b, "mt20id"),
       name: tag(b, "prfnm"),
       start: tag(b, "prfpdfrom"),
       end: tag(b, "prfpdto"),
       venue: tag(b, "fcltynm"),
+      area: tag(b, "area"),
       poster: tag(b, "poster"),
       genre: tag(b, "genrenm"),
       state: tag(b, "prfstate"),
       relates: [],
     }));
+    const regional = all.filter((it) => REGIONS.some((r) => it.area.includes(r)));
 
-    const err = { detailFailed: 0, detailError: "", facilityFailed: 0, facilityError: "" };
-    let next = 0;
+    const err = { detailFailed: 0, facilityFailed: 0, lastError: "" };
+    let i = offset;
     async function worker() {
-      while (next < items.length && Date.now() - start < TIME_BUDGET) {
-        const it = items[next++];
-        let d;
+      while (i < regional.length && Date.now() - start < TIME_BUDGET) {
+        const it = regional[i++];
         try {
-          d = await getDetail(it.id);
+          const d = await getDetail(it.id);
+          it.relates = d.relates;
+          if (d.venue) it.venue = d.venue;
+          if (it.genre === "뮤지컬" && d.relates.length && d.mt10id) {
+            try {
+              it.seats = hallSeats(await getFacility(d.mt10id), d.venue);
+            } catch (e) {
+              err.facilityFailed++;
+              err.lastError = e.message;
+            }
+          }
+          it.checked = true;
         } catch (e) {
           err.detailFailed++;
-          err.detailError = e.message;
-          continue;
+          err.lastError = e.message;
         }
-        it.relates = d.relates;
-        if (d.venue) it.venue = d.venue;
-        if (it.genre === "뮤지컬" && d.relates.length && d.mt10id) {
-          try {
-            it.seats = hallSeats(await getFacility(d.mt10id), d.venue);
-          } catch (e) {
-            err.facilityFailed++;
-            err.facilityError = e.message;
-          }
-        }
-        it.checked = true;
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
-    const checked = items.filter((it) => it.checked).length;
-    const shown = items.filter(
+    const done = regional.slice(offset, i);
+    const shown = done.filter(
       (it) => it.checked && it.relates.length && (it.genre !== "뮤지컬" || (it.seats || 0) >= MUSICAL_MIN_SEATS)
     );
-    const unchecked = items.length - checked;
+    let next = null;
+    if (i < regional.length) next = { page, offset: i };
+    else if (all.length >= PAGE_ROWS) next = { page: page + 1, offset: 0 };
 
-    res.setHeader(
-      "Cache-Control",
-      unchecked > 0 ? "s-maxage=120" : "s-maxage=1800, stale-while-revalidate=86400"
-    );
+    res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=86400");
     res.status(200).json({
       items: shown,
-      stats: { listed: items.length, checked, unchecked, ...err, musicalMinSeats: MUSICAL_MIN_SEATS },
+      next,
+      stats: {
+        page,
+        listed: all.length,
+        regional: regional.length,
+        processed: done.length,
+        areas: [...new Set(all.map((x) => x.area))].slice(0, 6),
+        ...err,
+      },
     });
   } catch (e) {
     res.status(502).json({ error: "KOPIS 조회에 실패했어요. 잠시 뒤 다시 시도해 주세요." });
