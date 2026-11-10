@@ -46,13 +46,15 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
 .none{font-size:12px;color:var(--muted);margin-top:6px}
 .state{padding:30px 10px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:14px}
 .state.err{color:var(--warn)}
+.prog{font-size:13px;color:var(--muted);margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn.g{background:var(--soft);color:var(--ink);font-weight:500}
 .foot{margin-top:16px;font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
 <main class="wrap">
   <h1>공연 모아보기</h1>
-  <p class="sub">공연예술통합전산망(KOPIS)의 공연 정보를 그때그때 불러와요.</p>
+  <p class="sub">서울·경기 공연장에서 예매처가 있는 공연만 모아 보여 줘요. 뮤지컬은 대극장만 보여요.</p>
 
   <div class="row"><span class="lab">종류</span><div class="row" id="cats" style="margin:0"></div></div>
   <div class="row"><span class="lab">기간</span>
@@ -75,8 +77,6 @@ h2 span{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
 </main>
 
 <script>
-// 종류 설정: label(버튼 이름), genre(KOPIS 장르 코드), q(공연명 키워드, 선택)
-// 장르 코드는 KOPIS 오픈API 문서에서 꼭 확인하고, 필요하면 아래 목록을 고쳐 쓰세요.
 var CATS = [
   {label:"전체"},
   {label:"뮤지컬", genre:"GGGA"},
@@ -86,7 +86,8 @@ var CATS = [
   {label:"대중음악", genre:"CCCD"},
   {label:"트로트 (부모님)", genre:"CCCD", q:"트로트"}
 ];
-var S = {cat:0, view:"list", items:[], loading:false};
+var S = {cat:0, view:"list", items:[], done:true, err:"", found:0};
+var MAX_PAGES = 10, RUN = 0;
 var $ = function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function safeUrl(u){return /^https?:\/\//i.test(u||"")?u:""}
@@ -104,33 +105,47 @@ function card(x){
   }).join("");
   return '<div class="card">'+poster+'<div class="info"><h3>'+esc(x.name)+'</h3>'+
     '<div class="meta">'+esc(x.venue)+'<br>'+esc(x.start)+' ~ '+esc(x.end)+'</div>'+
-    '<span class="tag">'+esc(x.genre)+'</span><span class="tag">'+esc(x.state)+'</span>'+
-    (links?'<div class="links">'+links+'</div>':'<div class="none">예매처 링크 정보가 없어요.</div>')+
-    '</div></div>';
+    '<span class="tag">'+esc(x.genre)+'</span>'+(x.seats?'<span class="tag">'+x.seats.toLocaleString("ko-KR")+'석</span>':'')+
+    '<span class="tag">'+esc((x.area||"").replace(/특별시|광역시|도$/,""))+'</span>'+
+    (links?'<div class="links">'+links+'</div>':'')+'</div></div>';
 }
 function render(){
-  if(S.loading){$("out").innerHTML='<div class="state">불러오는 중이에요…</div>';return}
-  if(!S.items.length){$("out").innerHTML='<div class="state">조건에 맞는 공연이 없어요.</div>';return}
-  if(S.view==="list"){$("out").innerHTML=S.items.map(card).join("");return}
-  var groups={},order=[];
-  S.items.forEach(function(x){
-    var names=(x.relates||[]).map(function(r){return r.name});
-    if(!names.length)names=["예매처 정보 없음"];
-    names.forEach(function(n){if(!groups[n]){groups[n]=[];order.push(n)}groups[n].push(x)});
-  });
-  $("out").innerHTML=order.map(function(n){
-    return '<h2>'+esc(n)+'<span>'+groups[n].length+'개</span></h2>'+groups[n].map(card).join("");
-  }).join("");
+  var head = S.err ? '<div class="state err">'+esc(S.err)+'</div>'
+    : (!S.done ? '<div class="prog">공연을 확인하는 중이에요. 지금까지 '+S.items.length+'개 찾았어요. <button class="btn g" id="stop">그만 찾기</button></div>' : '');
+  if(!S.items.length){
+    $("out").innerHTML = head + (S.done&&!S.err ? '<div class="state">조건에 맞는 공연이 없어요.</div>' : '');
+  } else if(S.view==="list"){
+    $("out").innerHTML = head + S.items.map(card).join("");
+  } else {
+    var groups={},order=[];
+    S.items.forEach(function(x){(x.relates||[]).forEach(function(r){if(!groups[r.name]){groups[r.name]=[];order.push(r.name)}groups[r.name].push(x)})});
+    $("out").innerHTML = head + order.map(function(n){
+      return '<h2>'+esc(n)+'<span>'+groups[n].length+'개</span></h2>'+groups[n].map(card).join("");
+    }).join("");
+  }
+  var st=$("stop"); if(st) st.onclick=function(){RUN++;S.done=true;render()};
 }
 function load(){
-  var c=CATS[S.cat],off=+$("period").value,qv=$("q").value.trim()||c.q||"";
+  var run=++RUN, c=CATS[S.cat], off=+$("period").value, qv=$("q").value.trim()||c.q||"";
   var a=new Date();a.setDate(a.getDate()+off);
   var b=new Date(a.getTime());b.setDate(b.getDate()+30);
-  var u="/api/shows?from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"");
-  S.loading=true;render();
-  fetch(u).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"오류");return j})})
-  .then(function(j){S.items=j.items||[];S.loading=false;render()})
-  .catch(function(e){S.loading=false;$("out").innerHTML='<div class="state err">'+esc(e.message||"불러오지 못했어요.")+'</div>'});
+  var base="/api/shows?from="+ymd(a)+"&to="+ymd(b)+(c.genre?"&genre="+c.genre:"")+(qv?"&q="+encodeURIComponent(qv):"");
+  var page=1, offset=0, seen={};
+  S.items=[];S.done=false;S.err="";render();
+  function step(){
+    if(run!==RUN) return;
+    fetch(base+"&page="+page+"&offset="+offset)
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"오류");return j})})
+    .then(function(j){
+      if(run!==RUN) return;
+      (j.items||[]).forEach(function(x){if(!seen[x.id]){seen[x.id]=1;S.items.push(x)}});
+      S.items.sort(function(p,q){return p.start<q.start?-1:p.start>q.start?1:0});
+      if(j.next && j.next.page<=MAX_PAGES){page=j.next.page;offset=j.next.offset;render();setTimeout(step,500)}
+      else{S.done=true;render()}
+    })
+    .catch(function(e){if(run!==RUN)return;S.done=true;S.err=e.message||"불러오지 못했어요.";render()});
+  }
+  step();
 }
 $("cats").addEventListener("click",function(e){var b=e.target.closest("[data-i]");if(!b)return;S.cat=+b.dataset.i;renderCats();load()});
 $("period").addEventListener("change",load);
